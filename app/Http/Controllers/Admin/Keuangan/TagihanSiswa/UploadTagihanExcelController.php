@@ -51,7 +51,9 @@ class UploadTagihanExcelController extends Controller
         $data['periode_tahun_list'] = range($currentYear - 2, $currentYear + 5);
         $data['periode_tahun_default'] = $currentYear;
         $data['periode_bulan_default'] = (int) date('m');
-        $data['tagihan'] = mst_tagihan::orderBy('urut', 'asc')->get();
+        $data['tagihan'] = mst_tagihan::query()
+            ->orderBy('urut', 'asc')
+            ->get();
 
         return view('admin.keuangan.tagihan_siswa.upload_tagihan_excel.index', $data);
     }

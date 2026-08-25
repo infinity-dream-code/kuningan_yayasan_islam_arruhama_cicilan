@@ -65,7 +65,6 @@ return [
 
         "DATA_MYSQL" => [
             "driver" => "mysql",
-            "url" => env("DATABASE_URL"),
             "host" => env("DB_HOST_DATA_MYSQL", "127.0.0.1"),
             "port" => env("DB_PORT_DATA_MYSQL", "3306"),
             "database" => env("DB_DATABASE_DATA_MYSQL", "forge"),

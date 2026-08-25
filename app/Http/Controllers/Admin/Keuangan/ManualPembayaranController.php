@@ -167,13 +167,11 @@ class ManualPembayaranController extends Controller
                     $item->nmcust = $item->NMCUST;
                     $item->kelas_label = trim(($item->DESC02 ?? '') . ' ' . ($item->DESC03 ?? ''));
                     $nis = $item->NOCUST;
-                    if ($nis && $nis !== '-') {
-                        $item->NOVA = scctcust::showVA($nis);
-                    } elseif ($item->NUM2ND && $item->NUM2ND !== '-') {
-                        $item->NOVA = scctcust::showVA($item->NUM2ND);
-                    } else {
-                        $item->NOVA = '-';
-                    }
+                    $va = MultiVa::resolveFromBill($item);
+                    $vaSource = ($nis && $nis !== '-') ? $nis : $item->NUM2ND;
+                    $item->NOVA = $vaSource
+                        ? scctcust::formatVA(MultiVa::prefix($va ?? MultiVa::OPEN), $vaSource)
+                        : '-';
                     $item->PAYMENTLEFT = $this->resolvePaymentLeft($item);
                     $item->sisa_bayar = $item->PAYMENTLEFT;
                     $item->can_cicil = mst_tagihan::canInstallment($item->BILLNM) ? 1 : 0;

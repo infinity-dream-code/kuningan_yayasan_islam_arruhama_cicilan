@@ -113,15 +113,12 @@
                         <label class="required form-label" for="tagihan">Jenis Tagihan</label>
                         <select class="form-select" id="tagihan" name="tagihan" required
                                 data-control="select2" data-placeholder="Pilih jenis tagihan">
-                            @isset($tagihan)
-                                @foreach($tagihan as $item)
-                                    <option value="{{ $item->urut }}">
-                                        {{ $item->tagihan }} ({{ \App\Support\MultiVa::shortLabel($item->VA) }})
-                                    </option>
-                                @endforeach
-                            @else
-                                <option value="">Data kosong</option>
-                            @endisset
+                            <option value=""></option>
+                            @forelse(($tagihan ?? []) as $item)
+                                <option value="{{ $item->urut ?? $item->getKey() }}">{{ \App\Support\MultiVa::masterOptionText($item) }}</option>
+                            @empty
+                                <option value="" disabled>Master tagihan kosong — isi di menu Master Tagihan</option>
+                            @endforelse
                         </select>
                     </div>
                     <div class="col-md-6 col-xl-7">
@@ -432,7 +429,6 @@
                     // select2Focus($this);
                     $this.wrap('<div class="position-relative"></div>').select2({
                         placeholder: $this.data('placeholder') || 'Pilih',
-                        language: 'id',
                         dropdownParent: $this.parent(),
                         width: '100%',
                     });

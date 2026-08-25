@@ -40,10 +40,10 @@ class MultiVa
         }
 
         $digits = preg_replace('/\D/', '', $raw);
-        if ($digits === self::OPEN || str_ends_with($digits, self::OPEN)) {
+        if (in_array($digits, [self::OPEN, self::openPrefix()], true)) {
             return self::OPEN;
         }
-        if ($digits === self::CLOSE || str_ends_with($digits, self::CLOSE)) {
+        if (in_array($digits, [self::CLOSE, self::closePrefix()], true)) {
             return self::CLOSE;
         }
 
@@ -70,6 +70,33 @@ class MultiVa
             self::CLOSE => 'Close',
             default => '-',
         };
+    }
+
+    public static function resolveFromMaster(object $tagihan): ?string
+    {
+        $va = self::normalize($tagihan->VA ?? $tagihan->va ?? null);
+        if ($va !== null) {
+            return $va;
+        }
+
+        if (!isset($tagihan->isINSTALLMENT) || $tagihan->isINSTALLMENT === null || $tagihan->isINSTALLMENT === '') {
+            return null;
+        }
+
+        return (int) $tagihan->isINSTALLMENT === 1 ? self::OPEN : self::CLOSE;
+    }
+
+    public static function masterOptionText(object $item): string
+    {
+        $name = trim((string) ($item->tagihan ?? ''));
+        $va = self::resolveFromMaster($item);
+        $suffix = match ($va) {
+            self::OPEN => 'Open',
+            self::CLOSE => 'Close',
+            default => '-',
+        };
+
+        return $name === '' ? $suffix : "{$name} ({$suffix})";
     }
 
     public static function optionLabel(string $reffBank): string
@@ -102,6 +129,18 @@ class MultiVa
         return "v_trans_saldo_multivapertagihan{$va}";
     }
 
+    /** View v_saldo_va_multivapertagihan93 / 94 */
+    public static function saldoQuery(string $reffBank)
+    {
+        return DB::connection('DATA_MYSQL')->table(self::saldoView($reffBank));
+    }
+
+    /** View v_trans_saldo_multivapertagihan93 / 94 */
+    public static function transQuery(string $reffBank)
+    {
+        return DB::connection('DATA_MYSQL')->table(self::transView($reffBank));
+    }
+
     public static function paymentFunction(string $reffBank): string
     {
         $va = self::normalize($reffBank) ?? self::OPEN;
@@ -121,9 +160,9 @@ class MultiVa
             return null;
         }
 
-        $mstVa = mst_tagihan::query()->where('tagihan', $billName)->value('VA');
+        $mst = mst_tagihan::query()->where('tagihan', $billName)->first();
 
-        return self::normalize($mstVa);
+        return $mst ? self::resolveFromMaster($mst) : null;
     }
 
     public static function resolveFromBill(object $bill): ?string
@@ -136,7 +175,7 @@ class MultiVa
 
     public static function requireFromMaster(mst_tagihan $tagihan): string
     {
-        $va = self::normalize($tagihan->VA ?? null);
+        $va = self::resolveFromMaster($tagihan);
         if ($va === null) {
             throw new RuntimeException(
                 'Jenis tagihan "' . $tagihan->tagihan . '" belum diset VA Open (93) atau Close (94).'
@@ -152,8 +191,7 @@ class MultiVa
             return 0;
         }
 
-        $row = DB::connection('DATA_MYSQL')
-            ->table(self::saldoView($reffBank))
+        $row = self::saldoQuery($reffBank)
             ->where('CUSTID', $custId)
             ->first();
 

@@ -110,14 +110,50 @@ class SaldoVirtualAccountController extends Controller
         return route($this->routeBase . '.' . $name, $params);
     }
 
-    protected function saldoView(): string
+    protected function saldoQuery()
     {
-        return MultiVa::saldoView($this->reffBank);
+        return MultiVa::saldoQuery($this->reffBank);
     }
 
-    protected function transView(): string
+    protected function transQuery()
     {
-        return MultiVa::transView($this->reffBank);
+        return MultiVa::transQuery($this->reffBank);
+    }
+
+    protected function transListQuery()
+    {
+        $view = MultiVa::transView($this->reffBank);
+
+        return DB::connection('DATA_MYSQL')
+            ->table($view . ' as trx')
+            ->leftJoin('scctcust as c', 'c.NOCUST', '=', 'trx.NOCUST')
+            ->select([
+                'trx.TRXDATE as TRXDATE',
+                'trx.KETERANGAN as KETERANGAN',
+                'trx.DEBET as DEBET',
+                'trx.KREDIT as KREDIT',
+                'trx.NOCUST as NOCUST',
+                'trx.NUM2ND as NUM2ND',
+                'trx.NOREFF as NOREFF',
+                'c.NMCUST as NMCUST',
+                'c.CODE01 as CODE01',
+                'c.CODE02 as CODE02',
+                'c.DESC02 as DESC02',
+                'c.DESC03 as DESC03',
+            ]);
+    }
+
+    protected function applySiswaToTrans($query, ?scctcust $siswa, string $nocustCol = 'NOCUST', string $num2ndCol = 'NUM2ND')
+    {
+        if (!$siswa) {
+            return $query;
+        }
+
+        if ($siswa->NOCUST) {
+            return $query->where($nocustCol, $siswa->NOCUST);
+        }
+
+        return $query->where($num2ndCol, $siswa->NUM2ND ?? '');
     }
 
     protected function formatNova(mixed $nis): string
@@ -173,12 +209,7 @@ class SaldoVirtualAccountController extends Controller
                 }
                 $data['siswa']->NOVA = $NOVA;
 
-                $trxQuery = DB::connection('DATA_MYSQL')->table($this->transView());
-                if ($data['siswa']->NOCUST) {
-                    $trxQuery->where('NOCUST', $data['siswa']->NOCUST);
-                } else {
-                    $trxQuery->where('NUM2ND', $data['siswa']->NUM2ND);
-                }
+                $trxQuery = $this->applySiswaToTrans($this->transQuery(), $data['siswa']);
                 $data['totalKredit'] = (int) (clone $trxQuery)->sum('KREDIT');
                 $data['totalDebet'] = (int) (clone $trxQuery)->sum('DEBET');
 //                $data['siswa']-> = $NOVA;
@@ -283,12 +314,7 @@ class SaldoVirtualAccountController extends Controller
     private function getCustTransactions(string|int $custId)
     {
         $siswa = scctcust::query()->where('CUSTID', $custId)->first();
-        $query = DB::connection('DATA_MYSQL')->table($this->transView());
-        if ($siswa?->NOCUST) {
-            $query->where('NOCUST', $siswa->NOCUST);
-        } else {
-            $query->where('NUM2ND', $siswa->NUM2ND ?? '');
-        }
+        $query = $this->applySiswaToTrans($this->transQuery(), $siswa);
 
         return $query->orderBy('TRXDATE', 'desc')
             ->get()
@@ -357,16 +383,19 @@ class SaldoVirtualAccountController extends Controller
         }
 
         $columnName = match ($columnName) {
-            'saldo' => 'SALDO',
-            default => str_contains((string) $columnName, '.') ? substr($columnName, strrpos($columnName, '.') + 1) : $columnName,
+            'saldo', 'SALDO' => 'SALDO',
+            'NOCUST' => 'NOCUST',
+            'NMCUST' => 'NMCUST',
+            'CODE02' => 'CODE02',
+            'DESC02' => 'DESC02',
+            'DESC03' => 'DESC03',
+            'NUM2ND' => 'NUM2ND',
+            'DESC04' => 'DESC04',
+            'CUSTID' => 'CUSTID',
+            default => 'NOCUST',
         };
 
-        $allowedSort = ['NOCUST', 'NMCUST', 'CODE02', 'DESC02', 'DESC03', 'NUM2ND', 'DESC04', 'SALDO', 'CUSTID'];
-        if (!in_array($columnName, $allowedSort, true)) {
-            $columnName = $defaultColumn;
-        }
-
-        $query = DB::connection('DATA_MYSQL')->table($this->saldoView());
+        $query = $this->saldoQuery();
 
         $filter = $request->input('filter');
         if ($filter) {
@@ -406,15 +435,17 @@ class SaldoVirtualAccountController extends Controller
             });
         }
 
-        $totalRecords = (int) DB::connection('DATA_MYSQL')->table($this->saldoView())
-            ->when(!empty($scopedCodes), fn ($q) => $q->whereIn('CODE01', $scopedCodes))
-            ->count();
-        $totalRecordswithFilter = (clone $query)->count();
+        $totalQuery = $this->saldoQuery()
+            ->when(!empty($scopedCodes), fn ($q) => $q->whereIn('CODE01', $scopedCodes));
+        $totalRecords = (int) $totalQuery->count();
+        $totalRecordswithFilter = (int) (clone $query)->count();
 
-        $records = (clone $query)
-            ->orderBy($columnName, $columnSortOrder)
-            ->skip($start)
-            ->take($rowperpage)
+        $pageQuery = (clone $query)->orderBy($columnName, $columnSortOrder)->skip($start);
+        if ((int) $rowperpage > 0) {
+            $pageQuery->take($rowperpage);
+        }
+
+        $records = $pageQuery
             ->get()
             ->map(function ($item) {
                 $item->item_id = $item->CUSTID;
@@ -477,22 +508,16 @@ class SaldoVirtualAccountController extends Controller
         $searchValue = $search_arr['value'] ?? '';
 
         $columnName = match ($columnName) {
-            'METODE' => 'KETERANGAN',
-            'no', '', null => $defaultColumn,
-            default => str_contains((string) $columnName, '.') ? substr($columnName, strrpos($columnName, '.') + 1) : $columnName,
+            'METODE', 'KETERANGAN' => 'KETERANGAN',
+            'DEBET' => 'DEBET',
+            'KREDIT' => 'KREDIT',
+            'NOREFF' => 'NOREFF',
+            'NOCUST' => 'NOCUST',
+            'no', '', null => 'TRXDATE',
+            default => 'TRXDATE',
         };
-        if (!in_array($columnName, ['TRXDATE', 'KETERANGAN', 'DEBET', 'KREDIT', 'NOREFF', 'NOCUST'], true)) {
-            $columnName = $defaultColumn;
-        }
 
-        $query = DB::connection('DATA_MYSQL')->table($this->transView());
-        if ($siswa) {
-            if ($siswa->NOCUST) {
-                $query->where('NOCUST', $siswa->NOCUST);
-            } else {
-                $query->where('NUM2ND', $siswa->NUM2ND);
-            }
-        }
+        $query = $this->applySiswaToTrans($this->transQuery(), $siswa);
 
         if (!blank($searchValue)) {
             $sanitizeSearch = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $searchValue);
@@ -506,10 +531,12 @@ class SaldoVirtualAccountController extends Controller
         $totalRecords = (clone $query)->count();
         $totalRecordswithFilter = $totalRecords;
 
-        $records = (clone $query)
-            ->orderBy($columnName, $columnSortOrder)
-            ->skip($start)
-            ->take($rowperpage)
+        $pageQuery = (clone $query)->orderBy($columnName, $columnSortOrder)->skip($start);
+        if ((int) $rowperpage > 0) {
+            $pageQuery->take($rowperpage);
+        }
+
+        $records = $pageQuery
             ->get()
             ->map(function ($item) {
                 $item->METODE = $item->KETERANGAN ?? null;
@@ -520,12 +547,7 @@ class SaldoVirtualAccountController extends Controller
         $totalKredit = 0;
         $totalDebet = 0;
         if ($siswa) {
-            $sumQuery = DB::connection('DATA_MYSQL')->table($this->transView());
-            if ($siswa->NOCUST) {
-                $sumQuery->where('NOCUST', $siswa->NOCUST);
-            } else {
-                $sumQuery->where('NUM2ND', $siswa->NUM2ND);
-            }
+            $sumQuery = $this->applySiswaToTrans($this->transQuery(), $siswa);
             $totalKredit = (int) (clone $sumQuery)->sum('KREDIT');
             $totalDebet = (int) (clone $sumQuery)->sum('DEBET');
         }
@@ -607,7 +629,7 @@ class SaldoVirtualAccountController extends Controller
         $search_arr = $request->get('search', []);
         $searchValue = $search_arr['value'] ?? '';
 
-        $defaultColumn = 't.TRXDATE';
+        $defaultColumn = 'trx.TRXDATE';
         $defaultOrder = 'desc';
         $columnName = $defaultColumn;
         $columnSortOrder = $defaultOrder;
@@ -619,16 +641,20 @@ class SaldoVirtualAccountController extends Controller
             $requestedData = $columnName_arr[$columnIndex]['data'] ?? null;
             if ($requestedData && $requestedData !== 'no') {
                 $columnName = match ($requestedData) {
-                    'NOCUST', 'NMCUST', 'CODE02', 'DESC02', 'DESC03' => 'c.' . $requestedData,
-                    'NOVA' => 't.NOCUST',
-                    'METODE' => 't.KETERANGAN',
-                    default => 't.' . $requestedData,
+                    'NOCUST' => 'trx.NOCUST',
+                    'NMCUST', 'CODE02', 'DESC02', 'DESC03' => 'c.' . $requestedData,
+                    'NOVA' => 'trx.NOCUST',
+                    'METODE' => 'trx.KETERANGAN',
+                    'TRXDATE' => 'trx.TRXDATE',
+                    'DEBET' => 'trx.DEBET',
+                    'KREDIT' => 'trx.KREDIT',
+                    'NOREFF' => 'trx.NOREFF',
+                    default => 'trx.TRXDATE',
                 };
             }
         }
 
-        $query = DB::connection('DATA_MYSQL')->table($this->transView() . ' as t')
-            ->leftJoin('scctcust as c', 'c.NOCUST', '=', 't.NOCUST');
+        $query = $this->transListQuery();
 
         $filter = $request->input('filter', []);
         foreach ($filter as $key => $val) {
@@ -640,7 +666,7 @@ class SaldoVirtualAccountController extends Controller
                 $date = Carbon::createFromFormat('d-m-Y', $val);
                 if ($date) {
                     $query->where(
-                        't.TRXDATE',
+                        'trx.TRXDATE',
                         $key === 'dari_tanggal' ? '>=' : '<=',
                         $key === 'dari_tanggal' ? $date->copy()->startOfDay() : $date->copy()->endOfDay()
                     );
@@ -656,32 +682,19 @@ class SaldoVirtualAccountController extends Controller
         if (!blank($searchValue)) {
             $sanitizeSearch = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $searchValue);
             $query->where(function ($q) use ($sanitizeSearch) {
-                $q->where('t.NOCUST', 'like', '%' . $sanitizeSearch . '%')
-                    ->orWhere('t.NUM2ND', 'like', '%' . $sanitizeSearch . '%')
-                    ->orWhere('t.NOREFF', 'like', '%' . $sanitizeSearch . '%')
-                    ->orWhere('t.KETERANGAN', 'like', '%' . $sanitizeSearch . '%')
+                $q->where('trx.NOCUST', 'like', '%' . $sanitizeSearch . '%')
+                    ->orWhere('trx.NUM2ND', 'like', '%' . $sanitizeSearch . '%')
+                    ->orWhere('trx.NOREFF', 'like', '%' . $sanitizeSearch . '%')
+                    ->orWhere('trx.KETERANGAN', 'like', '%' . $sanitizeSearch . '%')
                     ->orWhere('c.NMCUST', 'like', '%' . $sanitizeSearch . '%');
             });
         }
 
-        $totalRecords = (int) DB::connection('DATA_MYSQL')->table($this->transView())->count();
+        $totalRecords = (int) $this->transQuery()->count();
         $totalRecordswithFilter = (clone $query)->count();
 
         $records = (clone $query)
             ->orderBy($columnName, $columnSortOrder)
-            ->select([
-                't.NOCUST',
-                't.NUM2ND',
-                'c.NMCUST',
-                'c.CODE02',
-                'c.DESC02',
-                'c.DESC03',
-                't.TRXDATE',
-                't.KETERANGAN',
-                't.DEBET',
-                't.KREDIT',
-                't.NOREFF',
-            ])
             ->skip($start)
             ->take($rowperpage > 0 ? $rowperpage : 25)
             ->get()

@@ -9,6 +9,7 @@ use App\Support\MultiVa;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class MasterTagihanController extends Controller
@@ -53,14 +54,14 @@ class MasterTagihanController extends Controller
     public function getData(Request $request)
     {
         $draw = $request->get('draw');
-        $start = $request->get('start');
-        $rowperpage = $request->get('length');
+        $start = max(0, (int) $request->get('start', 0));
+        $rowperpage = (int) $request->get('length', 10);
 
         $columnIndex_arr = $request->get('order', []);
         $columnName_arr = $request->get('columns', []);
         $order_arr = $request->get('order', []);
         $search_arr = $request->get('search', []);
-        $searchValue = $search_arr['value'] ?? '';
+        $searchValue = trim((string) ($search_arr['value'] ?? ''));
 
         $columnName = 'urut';
         $columnSortOrder = 'asc';
@@ -83,38 +84,73 @@ class MasterTagihanController extends Controller
             $columnName = 'urut';
         }
 
-        $filtered = mst_tagihan::query()
-            ->when($searchValue !== '', function ($q) use ($searchValue) {
-                $q->where('tagihan', 'like', '%' . $searchValue . '%');
-            });
+        try {
+            $filtered = mst_tagihan::query()
+                ->when($searchValue !== '', function ($q) use ($searchValue) {
+                    $q->where('tagihan', 'like', '%' . $searchValue . '%');
+                });
 
-        $totalRecords = mst_tagihan::count();
-        $totalRecordswithFilter = (clone $filtered)->count();
+            $totalRecords = mst_tagihan::count();
+            $totalRecordswithFilter = (clone $filtered)->count();
 
-        $records = $filtered
-            ->orderBy($columnName, $columnSortOrder)
-            ->skip($start)
-            ->take($rowperpage)
-            ->get()
-            ->map(function ($item) {
-                $va = MultiVa::normalize($item->VA);
-                $item->item_id = $item->urut;
-                $item->VA = $va ?? (string) ($item->VA ?? '');
-                $item->va_label = $va ? MultiVa::optionLabel($va) : ((string) ($item->VA ?? '-') ?: '-');
-                $item->isINSTALLMENT_label = (int) $item->isINSTALLMENT === 1
-                    ? 'BISA DI CICIL'
-                    : 'TIDAK BISA DI CICIL';
-                $item->edit = true;
-                return $item;
-            })
-            ->toArray();
+            if ($totalRecords === 0) {
+                Log::warning('mst_tagihan kosong pada koneksi DATA_MYSQL', [
+                    'database' => DB::connection('DATA_MYSQL')->getDatabaseName(),
+                ]);
+            }
 
-        return response()->json([
-            'draw' => intval($draw),
-            'recordsTotal' => $totalRecords,
-            'recordsFiltered' => $totalRecordswithFilter,
-            'data' => $records,
-        ]);
+            $query = $filtered
+                ->orderBy($columnName, $columnSortOrder)
+                ->skip($start);
+
+            if ($rowperpage > 0) {
+                $query->take($rowperpage);
+            }
+
+            $records = $query
+                ->get()
+                ->map(function ($item) {
+                    $va = MultiVa::resolveFromMaster($item);
+
+                    return [
+                        'urut' => $item->urut,
+                        'item_id' => $item->urut,
+                        'tagihan' => $item->tagihan,
+                        'VA' => $va ?? (string) ($item->VA ?? $item->va ?? ''),
+                        'va_label' => $va
+                            ? MultiVa::optionLabel($va)
+                            : (((string) ($item->VA ?? $item->va ?? '')) !== '' ? (string) ($item->VA ?? $item->va) : '-'),
+                        'isINSTALLMENT' => (int) $item->isINSTALLMENT,
+                        'isINSTALLMENT_label' => (int) $item->isINSTALLMENT === 1
+                            ? 'BISA DI CICIL'
+                            : 'TIDAK BISA DI CICIL',
+                        'edit' => true,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return response()->json([
+                'draw' => intval($draw),
+                'recordsTotal' => $totalRecords,
+                'recordsFiltered' => $totalRecordswithFilter,
+                'data' => $records,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Gagal memuat master tagihan', [
+                'database' => DB::connection('DATA_MYSQL')->getDatabaseName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'draw' => intval($draw),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+                'error' => $e->getMessage(),
+                'message' => 'Gagal memuat master tagihan. Database: ' . DB::connection('DATA_MYSQL')->getDatabaseName(),
+            ], 500);
+        }
     }
 
     public function store(Request $request)

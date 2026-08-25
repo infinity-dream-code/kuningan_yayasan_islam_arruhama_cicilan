@@ -12,6 +12,7 @@ use App\Models\scctbill_detail;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
 use App\Support\SchoolScope;
+use App\Support\MultiVa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -343,6 +344,7 @@ class BuatTagihanController extends Controller
                         'FTGLTagihan' => now(),
                         'FSTSBolehBayar' => 1,
                         'BTA' => $tahun_pelajaran_bta,
+                        'va' => MultiVa::vaForBillName($billNm),
                     ]);
 
                     $bill->increment('BILLAM', (int) $nominal);

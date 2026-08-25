@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\MasterData;
 use App\Http\Controllers\Controller;
 use App\Models\mst_tagihan;
 use App\Models\ValidationMessage;
+use App\Support\MultiVa;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +33,20 @@ class MasterTagihanController extends Controller
         return [
             ['data' => null, 'name' => 'no', 'className' => 'text-center', 'columnType' => 'no'],
             ['data' => 'tagihan', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true],
+            ['data' => 'va_label', 'name' => 'VA', 'searchable' => false, 'orderable' => true],
             ['data' => 'isINSTALLMENT_label', 'name' => 'Status Dapat Di Cicil', 'searchable' => false, 'orderable' => true],
+            [
+                'data' => 'edit',
+                'name' => '',
+                'dataVal' => false,
+                'columnType' => 'button',
+                'className' => 'text-center',
+                'button' => 'modal',
+                'buttonText' => 'Edit',
+                'buttonClass' => 'btn btn-sm btn-info btn-edit',
+                'buttonLink' => '#modal-edit',
+                'buttonIcon' => 'ri-edit-line me-2',
+            ],
         ];
     }
 
@@ -55,23 +69,42 @@ class MasterTagihanController extends Controller
             $columnIndex = $columnIndex_arr[0]['column'] ?? null;
             if ($columnIndex !== null && !empty($columnName_arr[$columnIndex]['data']) && $columnName_arr[$columnIndex]['data'] !== 'no') {
                 $sortColumn = $columnName_arr[$columnIndex]['data'];
-                $columnName = $sortColumn === 'isINSTALLMENT_label' ? 'isINSTALLMENT' : $sortColumn;
+                $columnName = match ($sortColumn) {
+                    'isINSTALLMENT_label' => 'isINSTALLMENT',
+                    'va_label' => 'VA',
+                    default => $sortColumn,
+                };
                 $columnSortOrder = $order_arr[0]['dir'] ?? 'asc';
             }
         }
 
-        $totalRecords = mst_tagihan::count();
-        $totalRecordswithFilter = mst_tagihan::where('tagihan', 'like', '%' . $searchValue . '%')->count();
+        $allowedSort = ['urut', 'tagihan', 'VA', 'isINSTALLMENT'];
+        if (!in_array($columnName, $allowedSort, true)) {
+            $columnName = 'urut';
+        }
 
-        $records = mst_tagihan::orderBy($columnName, $columnSortOrder)
-            ->where('tagihan', 'like', '%' . $searchValue . '%')
+        $filtered = mst_tagihan::query()
+            ->when($searchValue !== '', function ($q) use ($searchValue) {
+                $q->where('tagihan', 'like', '%' . $searchValue . '%');
+            });
+
+        $totalRecords = mst_tagihan::count();
+        $totalRecordswithFilter = (clone $filtered)->count();
+
+        $records = $filtered
+            ->orderBy($columnName, $columnSortOrder)
             ->skip($start)
             ->take($rowperpage)
             ->get()
             ->map(function ($item) {
+                $va = MultiVa::normalize($item->VA);
+                $item->item_id = $item->urut;
+                $item->VA = $va ?? (string) ($item->VA ?? '');
+                $item->va_label = $va ? MultiVa::optionLabel($va) : ((string) ($item->VA ?? '-') ?: '-');
                 $item->isINSTALLMENT_label = (int) $item->isINSTALLMENT === 1
                     ? 'BISA DI CICIL'
                     : 'TIDAK BISA DI CICIL';
+                $item->edit = true;
                 return $item;
             })
             ->toArray();
@@ -90,7 +123,7 @@ class MasterTagihanController extends Controller
             $request->all(),
             [
                 'tagihan' => ['required', 'string', 'max:100'],
-                'isINSTALLMENT' => ['required', 'in:0,1'],
+                'VA' => ['required', 'in:93,94'],
             ],
             ValidationMessage::messages(),
             ValidationMessage::attributes()
@@ -98,6 +131,11 @@ class MasterTagihanController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()->first(), 'errors' => $validator->errors()], 422);
+        }
+
+        $va = MultiVa::normalize($request->VA);
+        if ($va === null) {
+            return response()->json(['message' => 'Tipe VA tidak valid'], 422);
         }
 
         $exists = mst_tagihan::where('tagihan', $request->tagihan)->first();
@@ -114,7 +152,8 @@ class MasterTagihanController extends Controller
                 'urut' => $nextUrut,
                 'tagihan' => strtoupper(trim($request->tagihan)),
                 'kode' => null,
-                'isINSTALLMENT' => (int) $request->isINSTALLMENT,
+                'VA' => $va,
+                'isINSTALLMENT' => MultiVa::isInstallment($va),
             ]);
 
             DB::connection('DATA_MYSQL')->commit();
@@ -124,6 +163,57 @@ class MasterTagihanController extends Controller
         } catch (Exception $e) {
             DB::connection('DATA_MYSQL')->rollBack();
             return response()->json(['message' => 'Data ' . $this->mainTitle . ' gagal disimpan', 'error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'tagihan' => ['required', 'string', 'max:100'],
+                'VA' => ['required', 'in:93,94'],
+            ],
+            ValidationMessage::messages(),
+            ValidationMessage::attributes()
+        );
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first(), 'errors' => $validator->errors()], 422);
+        }
+
+        $va = MultiVa::normalize($request->VA);
+        if ($va === null) {
+            return response()->json(['message' => 'Tipe VA tidak valid'], 422);
+        }
+
+        $row = mst_tagihan::where('urut', $id)->first();
+        if (!$row) {
+            return response()->json(['message' => 'Data tagihan tidak ditemukan'], 422);
+        }
+
+        $duplicate = mst_tagihan::where('tagihan', strtoupper(trim($request->tagihan)))
+            ->where('urut', '!=', $row->urut)
+            ->first();
+        if ($duplicate) {
+            return response()->json(['message' => 'Nama tagihan sudah ada'], 422);
+        }
+
+        try {
+            DB::connection('DATA_MYSQL')->beginTransaction();
+
+            $row->tagihan = strtoupper(trim($request->tagihan));
+            $row->VA = $va;
+            $row->isINSTALLMENT = MultiVa::isInstallment($va);
+            $row->save();
+
+            DB::connection('DATA_MYSQL')->commit();
+            mst_tagihan::flushInstallmentCache();
+
+            return response()->json(['message' => 'Data ' . $this->mainTitle . ' telah diubah']);
+        } catch (Exception $e) {
+            DB::connection('DATA_MYSQL')->rollBack();
+            return response()->json(['message' => 'Data ' . $this->mainTitle . ' gagal diubah', 'error' => $e->getMessage()], 422);
         }
     }
 }

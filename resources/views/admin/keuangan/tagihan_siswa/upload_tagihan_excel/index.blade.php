@@ -115,7 +115,9 @@
                                 data-control="select2" data-placeholder="Pilih jenis tagihan">
                             @isset($tagihan)
                                 @foreach($tagihan as $item)
-                                    <option value="{{ $item->urut }}">{{ $item->tagihan }}</option>
+                                    <option value="{{ $item->urut }}">
+                                        {{ $item->tagihan }} ({{ \App\Support\MultiVa::shortLabel($item->VA) }})
+                                    </option>
                                 @endforeach
                             @else
                                 <option value="">Data kosong</option>

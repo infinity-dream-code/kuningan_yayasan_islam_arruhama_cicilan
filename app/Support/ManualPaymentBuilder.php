@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use App\Support\MultiVa;
 
 class ManualPaymentBuilder
 {
@@ -28,7 +29,13 @@ class ManualPaymentBuilder
         $userId = $this->resolveCyberKeyUserId();
 
         if ($fidBank === self::SALDO_FIDBANK) {
-            $this->callBuilderPaymentBill($aa, $nominal);
+            $va = MultiVa::resolveFromBill($tagihan);
+            if ($va === null) {
+                throw new RuntimeException(
+                    'Tagihan belum memiliki VA Open/Close. Set tipe VA di Master Tagihan.'
+                );
+            }
+            $this->callBuilderPaymentBill($aa, $nominal, MultiVa::paymentFunction($va));
             return;
         }
 
@@ -84,21 +91,21 @@ class ManualPaymentBuilder
         ]);
     }
 
-    /** BuilderPaymentBill(aa, nominal) — 2 param sesuai definition DB */
-    private function callBuilderPaymentBill(string $aa, int $nominal): void
+    /** BuilderPaymentBill / BuilderPaymentBill_BankBayar_MultiVAPerTagihan93|94 (aa, nominal) */
+    private function callBuilderPaymentBill(string $aa, int $nominal, string $functionName = 'BuilderPaymentBill'): void
     {
         Log::info('manual-payment.builder.call', [
-            'function' => 'BuilderPaymentBill',
+            'function' => $functionName,
             'aa' => $aa,
             'nominal' => $nominal,
         ]);
 
-        $result = $this->invokeStoredFunction('BuilderPaymentBill', [
+        $result = $this->invokeStoredFunction($functionName, [
             $aa,
             $nominal,
         ]);
 
-        $this->assertBuilderResult('BuilderPaymentBill', $result, [
+        $this->assertBuilderResult($functionName, $result, [
             'aa' => $aa,
             'nominal' => $nominal,
         ]);
@@ -137,6 +144,8 @@ class ManualPaymentBuilder
         return match ($result) {
             'NOMINAL_SALAH_TAGIHAN_TIDAK_BOLEH_DICICIL' => 'Nominal pembayaran salah. Tagihan ini tidak boleh dicicil — harus dibayar lunas.',
             'MELEBIHI_TAGIHAN' => 'Nominal pembayaran melebihi sisa tagihan.',
+            'Insufficient_Balance' => 'Saldo VA siswa tidak mencukupi.',
+            'NOT_FOUND' => 'Tagihan tidak ditemukan atau sudah tidak bisa dibayar.',
             '' => 'Pembayaran gagal diproses oleh sistem (tidak ada respons dari database).',
             default => "Pembayaran gagal diproses oleh sistem ({$result}).",
         };

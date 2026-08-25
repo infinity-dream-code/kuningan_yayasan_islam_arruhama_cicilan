@@ -9,6 +9,7 @@ use App\Models\mst_thn_aka;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\MultiVa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -291,6 +292,7 @@ class EditManualController extends Controller
                 'BTA' => $tagihan->BTA,
                 'INSTALLMENT' => 0,
                 'isINSTALLABLE' => (int) ($mstTagihan->isINSTALLMENT ?? $tagihan->isINSTALLABLE ?? 0),
+                'va' => MultiVa::vaForBillName($tagihan->BILLNM, $mstTagihan->VA ?? $tagihan->va ?? null),
             ]);
 
             DB::commit();

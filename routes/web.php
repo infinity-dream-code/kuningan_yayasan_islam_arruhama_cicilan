@@ -56,6 +56,7 @@ Route::prefix("admin")
                     Route::get("get-column", "getColumn")->name("get-column");
                     Route::get("", "index")->name("index");
                     Route::post("", "store")->name("store");
+                    Route::put("{id}", "update")->name("update");
                 });
 
             Route::prefix("export-import-data")
@@ -178,25 +179,37 @@ Route::prefix("admin")
                 });
 
             Route::prefix("saldo")->name("saldo.")->group(function () {
-                Route::controller(\App\Http\Controllers\Admin\Keuangan\Saldo\SaldoVirtualAccountController::class)
-                    ->prefix("saldo-virtual-account")->name("saldo-virtual-account.")->group(function () {
-                        Route::get("get-data", "getData")->name("get-data");
-                        Route::get("get-column", "getColumn")->name("get-column");
-                        Route::get("get-saldo", "getSaldo")->name("get-saldo");
-                        Route::get("export-transaksi", "exportTransaksi")->name("export-transaksi");
-                        Route::get("{id}/export", "exportDetail")->name("export");
-                        Route::prefix("data-transaksi")->name("data-transaksi.")->group(function () {
-                            Route::get("", "transaksiIndex")->name("index");
-                            Route::get("get-data", "getDataDataTransaksi")->name("get-data");
-                            Route::get("get-column", "getColumnDataTransaksi")->name("get-column");
+                $registerSaldoVa = function (string $prefix, string $name, string $controller) {
+                    Route::controller($controller)
+                        ->prefix($prefix)->name("{$name}.")->group(function () {
+                            Route::get("get-data", "getData")->name("get-data");
+                            Route::get("get-column", "getColumn")->name("get-column");
+                            Route::get("get-saldo", "getSaldo")->name("get-saldo");
+                            Route::get("export-transaksi", "exportTransaksi")->name("export-transaksi");
+                            Route::get("{id}/export", "exportDetail")->name("export");
+                            Route::prefix("data-transaksi")->name("data-transaksi.")->group(function () {
+                                Route::get("", "transaksiIndex")->name("index");
+                                Route::get("get-data", "getDataDataTransaksi")->name("get-data");
+                                Route::get("get-column", "getColumnDataTransaksi")->name("get-column");
+                            });
+                            Route::prefix("transaksi")->name("transaksi.")->group(function () {
+                                Route::get("get-data", "getDataTran")->name("get-data");
+                                Route::get("get-column", "getColumnTran")->name("get-column");
+                            });
                         });
-                        Route::post("tarik", "tarik")->name("tarik");
-                        Route::prefix("transaksi")->name("transaksi.")->group(function () {
-                            Route::get("get-data", "getDataTran")->name("get-data");
-                            Route::get("get-column", "getColumnTran")->name("get-column");
-                        });
-                    });
-                Route::resource("saldo-virtual-account", \App\Http\Controllers\Admin\Keuangan\Saldo\SaldoVirtualAccountController::class)->names("saldo-virtual-account");
+                    Route::resource($prefix, $controller)->names($name);
+                };
+
+                $registerSaldoVa(
+                    "saldo-virtual-account",
+                    "saldo-virtual-account",
+                    \App\Http\Controllers\Admin\Keuangan\Saldo\SaldoVirtualAccountController::class
+                );
+                $registerSaldoVa(
+                    "saldo-va-close",
+                    "saldo-va-close",
+                    \App\Http\Controllers\Admin\Keuangan\Saldo\SaldoVaCloseController::class
+                );
             });
 
             Route::prefix("hapus-tagihan")->name("hapus-tagihan.")->group(function () {

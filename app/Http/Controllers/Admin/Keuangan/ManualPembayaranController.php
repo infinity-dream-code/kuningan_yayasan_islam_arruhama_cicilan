@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin\Keuangan;
 
-use App\Http\Controllers\Admin\Keuangan\Saldo\SaldoVirtualAccountController;
 use App\Http\Controllers\Controller;
 use App\Models\mst_tagihan;
 use App\Models\scctbill;
@@ -12,6 +11,7 @@ use App\Models\User;
 use App\Models\ValidationMessage;
 use App\Support\ManualPaymentBuilder;
 use App\Support\MetodeBayarHelper;
+use App\Support\MultiVa;
 use App\Support\SchoolScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
@@ -133,6 +133,7 @@ class ManualPembayaranController extends Controller
                 'scctbill.FIDBANK',
                 'scctbill.NOREFF',
                 'scctbill.FUrutan',
+                'scctbill.va',
                 'scctcust.CUSTID',
                 'scctcust.CODE02',
                 'scctcust.DESC02',
@@ -355,16 +356,40 @@ class ManualPembayaranController extends Controller
             DB::connection('DATA_MYSQL')->beginTransaction();
 
             if ($request->bank == '1140002') {
-                $saldoController = new SaldoVirtualAccountController();
-                $saldo = $saldoController->resolveCustSaldo($request->siswa);
-                if ($saldo < $totalBayar) {
-                    $this->rollbackManualPaymentTransactions();
-                    return response()->json(['message' => 'Saldo siswa kurang.<br> saldo: Rp.' . $saldo], 422);
+                $needed = [MultiVa::OPEN => 0, MultiVa::CLOSE => 0];
+                foreach ($tagihans as $item) {
+                    $keyForSearch = array_search($item->AA, $posts);
+                    $nominal = (int) $nominalBayar[$keyForSearch];
+                    $va = MultiVa::resolveFromBill($item);
+                    if ($va === null) {
+                        $this->rollbackManualPaymentTransactions();
+                        return response()->json([
+                            'message' => 'Tagihan ' . ($item->BILLNM ?? '') . ' belum memiliki VA Open/Close. Set tipe VA di Master Tagihan.',
+                        ], 422);
+                    }
+                    $needed[$va] += $nominal;
                 }
-                $sisaSaldo = $saldo - $totalBayar;
+
+                $sisaParts = [];
+                foreach ($needed as $va => $amount) {
+                    if ($amount <= 0) {
+                        continue;
+                    }
+                    $saldo = MultiVa::custSaldo($request->siswa, $va);
+                    if ($saldo < $amount) {
+                        $this->rollbackManualPaymentTransactions();
+                        return response()->json([
+                            'message' => 'Saldo VA ' . MultiVa::optionLabel($va) . ' kurang.<br> saldo: Rp. '
+                                . number_format($saldo, 0, ',', '.')
+                                . '<br> kebutuhan: Rp. ' . number_format($amount, 0, ',', '.'),
+                        ], 422);
+                    }
+                    $sisaParts[] = MultiVa::shortLabel($va) . ': Rp. ' . number_format($saldo - $amount, 0, ',', '.');
+                }
+
                 $message = 'Tagihan sukses dibayar.
                                 <br> Total Bayar: Rp. ' . number_format($totalBayar, 0, ',', '.') . '.
-                                <br> Sisa saldo: Rp. ' . number_format($sisaSaldo, 0, ',', '.') . '.
+                                <br> Sisa saldo: ' . implode(' | ', $sisaParts) . '.
                                 <br> apakah anda ingin mencetak pembayaran tagihan?';
             }
 

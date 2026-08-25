@@ -9,6 +9,7 @@ use App\Models\mst_thn_aka;
 use App\Models\scctbill;
 use App\Models\scctbill_detail;
 use App\Models\scctcust;
+use App\Support\MultiVa;
 use App\Support\SchoolScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -176,6 +177,7 @@ class CopyTagihanController extends Controller
                     'FTGLTagihan' => now(),
                     'FIDBANK' => null,
                     'BTA' => $request->thn_aka,
+                    'va' => MultiVa::vaForBillName($tagihanBaruNm, $oldBill->va ?? $oldBill->VA ?? null),
                 ]);
 
                 $details = scctbill_detail::where('CUSTID', $oldBill->CUSTID)

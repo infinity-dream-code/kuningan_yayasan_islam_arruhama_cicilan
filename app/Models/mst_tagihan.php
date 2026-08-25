@@ -22,6 +22,7 @@ class mst_tagihan extends Model
         "tagihan",
         "kode",
         "isINSTALLMENT",
+        "VA",
     ];
 
     protected $casts = [

@@ -49,8 +49,8 @@
             </table>
         </div>
         <div class="card-footer">
-            <small class="text-primary fw-semibold">
-                PERUBAHAN STATUS DAPAT DI CICIL/TIDAK HUB HELPDESK
+            <small class="text-muted">
+                Open (93) = bisa dicicil. Close (94) = harus lunas.
             </small>
         </div>
     </div>
@@ -78,7 +78,12 @@
             lengthMenu: [10, 25, 50, 75, 100],
         };
 
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        let modalEdit;
+
         document.addEventListener("DOMContentLoaded", function () {
+            modalEdit = new bootstrap.Modal(document.getElementById('modal-edit'));
+
             if (dtOptions.dataUrl && dtOptions.columnUrl) {
                 getDT(dtOptions);
             }
@@ -115,10 +120,10 @@
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label required" for="isINSTALLMENT">Status Dapat Di Cicil</label>
-                                <select class="form-select" name="isINSTALLMENT" id="isINSTALLMENT" data-control="select2" required>
-                                    <option value="0">TIDAK BISA DI CICIL</option>
-                                    <option value="1">BISA DI CICIL</option>
+                                <label class="form-label required" for="VA">Tipe VA</label>
+                                <select class="form-select" name="VA" id="VA" data-control="select2" required>
+                                    <option value="93">93 - Open (bisa dicicil)</option>
+                                    <option value="94">94 - Close (tidak bisa dicicil)</option>
                                 </select>
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
@@ -142,21 +147,88 @@
         </div>
     </form>
 
+    <form id="editForm" class="mainForm">
+        <div class="modal modal-blur fade" id="modal-edit" tabindex="-1" role="dialog" aria-hidden="true"
+             data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Master Tagihan</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body py-4">
+                        <fieldset class="form-fieldset">
+                            <div class="mb-3">
+                                <label class="form-label required" for="edit_tagihan">Nama Tagihan</label>
+                                <input type="text" class="form-control" name="tagihan" id="edit_tagihan" autocomplete="off"
+                                       placeholder="Contoh: SPP" required>
+                                <div class="invalid-feedback" role="alert"><strong></strong></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required" for="edit_VA">Tipe VA</label>
+                                <select class="form-select" name="VA" id="edit_VA" data-control="select2" required>
+                                    <option value="93">93 - Open (bisa dicicil)</option>
+                                    <option value="94">94 - Close (tidak bisa dicicil)</option>
+                                </select>
+                                <div class="invalid-feedback" role="alert"><strong></strong></div>
+                            </div>
+                        </fieldset>
+                        <input type="hidden" id="edit_id" name="item_id" value="">
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <input type="reset" value="Batal" class="btn btn-outline-secondary w-100"
+                                           data-bs-dismiss="modal">
+                                </div>
+                                <div class="col">
+                                    <input type="submit" value="Simpan Perubahan" class="btn btn-primary w-100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            document.querySelector(`#${dtOptions.tableId} tbody`).addEventListener('click', function (e) {
+                const rowEl = e.target.closest('tr');
+                if (!rowEl) return;
+                if (!e.target.closest('.btn-edit')) return;
+
+                const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
+                document.getElementById('edit_tagihan').value = rowData.tagihan || '';
+                document.getElementById('edit_id').value = rowData.item_id || '';
+                const vaValue = String(rowData.VA || '') === '94' ? '94' : '93';
+                $('#edit_VA').val(vaValue).trigger('change');
+                modalEdit.show();
+            });
+
             document.querySelectorAll(".mainForm").forEach(form => {
                 form.addEventListener("submit", function (e) {
                     e.preventDefault();
                     loadingAlert();
 
+                    const isEdit = form.id === 'editForm';
                     const formData = new FormData(this);
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                     formData.append("_token", csrfToken);
+                    if (isEdit) {
+                        formData.append("_method", "PUT");
+                    }
 
                     clearErrorMessages(form.id);
-                    fetch("{{ route('admin.master-data.master-tagihan.store') }}", {
+                    const itemId = document.getElementById('edit_id').value;
+                    const url = isEdit
+                        ? "{{ url('admin/master-data/master-tagihan') }}/" + itemId
+                        : "{{ route('admin.master-data.master-tagihan.store') }}";
+
+                    fetch(url, {
                         method: "POST",
-                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        headers: {'X-CSRF-TOKEN': csrfToken, 'X-HTTP-Method-Override': isEdit ? 'PUT' : 'POST'},
                         body: formData
                     })
                         .then(response => {
@@ -169,6 +241,9 @@
                         })
                         .then(data => {
                             document.getElementById(form.id).reset();
+                            if (isEdit) {
+                                $('#edit_VA').val('93').trigger('change');
+                            }
                             successAlert(data.message);
                             dataReload("main_table");
                             document.querySelector(`#${form.id} [data-bs-dismiss="modal"]`)?.click();

@@ -40,6 +40,8 @@ class ValidationMessage extends Model
             "periode_tahun" => "Tahun periode",
             "periode_bulan" => "Bulan periode",
             "tagihan" => "Tagihan",
+            "VA" => "Tipe VA",
+            "isINSTALLMENT" => "Status Dapat Di Cicil",
             "client_name_wa" => "Nama Client WA",
             "no_wa" => "No WA",
             "Title" => "Judul",

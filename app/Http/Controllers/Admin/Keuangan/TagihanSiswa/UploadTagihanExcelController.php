@@ -8,6 +8,7 @@ use App\Models\mst_tagihan;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\MultiVa;
 use App\Support\SchoolScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -274,6 +275,7 @@ class UploadTagihanExcelController extends Controller
                 $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
                 $billCD = date('Y') . '/i' . date('m') . '-' . ($urut + 1);
                 $nominal = (int) $item['nominal'];
+                $va = MultiVa::requireFromMaster($tagihan);
 
                 scctbill::create([
                     'CUSTID' => $siswa->CUSTID,
@@ -289,7 +291,8 @@ class UploadTagihanExcelController extends Controller
                     'BTA' => $bta,
                     'BILLCD' => $billCD,
                     'INSTALLMENT' => 0,
-                    'isINSTALLABLE' => (int) ($tagihan->isINSTALLMENT ?? 0),
+                    'isINSTALLABLE' => MultiVa::isInstallment($va),
+                    'va' => $va,
                 ]);
                 $insertedCount++;
             }

@@ -9,6 +9,7 @@ use App\Models\mst_tagihan;
 use App\Models\scctbill;
 use App\Models\scctcust;
 use App\Models\ValidationMessage;
+use App\Support\MultiVa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -205,6 +206,8 @@ class UploadTagihanPMBExcelController extends Controller
 
                 $urut = $tagihanSiswaTerbaru ? $tagihanSiswaTerbaru['FUrutan'] + 1 : 1;
 
+                $va = MultiVa::requireFromMaster($tagihan);
+
                 scctbill::create([
                     'CUSTID' => $siswa->CUSTID,
                     'BILLAC' => $bta,
@@ -219,7 +222,8 @@ class UploadTagihanPMBExcelController extends Controller
                     'BTA' => $bta,
                     'BILLCD' => date('Y') . '/i' . date('m') . '-' . ($urut + 1),
                     'INSTALLMENT' => 0,
-                    'isINSTALLABLE' => (int) ($tagihan->isINSTALLMENT ?? 0),
+                    'isINSTALLABLE' => MultiVa::isInstallment($va),
+                    'va' => $va,
                 ]);
             }
 

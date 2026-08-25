@@ -72,8 +72,34 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-12">
+                    <div class="col-md-6">
                         <div class="mb-5">
+                            <label class="form-label" for="saldo_open">
+                                Saldo VA Open (93)
+                            </label>
+                            <div class="input-group input-group-merge">
+                                <span class="input-group-text">Rp. </span>
+                                <input readonly type="text" id="saldo_open" name="saldo_open"
+                                       placeholder="Saldo Open"
+                                       class="form-control"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-5">
+                            <label class="form-label" for="saldo_close">
+                                Saldo VA Close (94)
+                            </label>
+                            <div class="input-group input-group-merge">
+                                <span class="input-group-text">Rp. </span>
+                                <input readonly type="text" id="saldo_close" name="saldo_close"
+                                       placeholder="Saldo Close"
+                                       class="form-control"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="mb-5 d-none">
                             <label class="required form-label" for="saldo">
                                 Saldo
                             </label>
@@ -633,11 +659,14 @@
                     data: { 'siswa': siswa },
                     headers: { 'X-CSRF-TOKEN': csrfToken },
                 }).done(function (response) {
-                    const raw = typeof response === 'object' && response !== null
-                        ? (response.saldo !== undefined ? response.saldo : 0)
-                        : response;
-                    let saldo = parseInt(String(raw).replace(/\./g, ''), 10) || 0;
-                    $('#saldo').val(saldo.toLocaleString('id-ID'));
+                    const data = typeof response === 'object' && response !== null ? response : {};
+                    const formatSaldo = (raw) => {
+                        let saldo = parseInt(String(raw ?? 0).replace(/\./g, ''), 10) || 0;
+                        return saldo.toLocaleString('id-ID');
+                    };
+                    $('#saldo_open').val(formatSaldo(data.saldo_open ?? data.saldo_93 ?? 0));
+                    $('#saldo_close').val(formatSaldo(data.saldo_close ?? data.saldo_94 ?? 0));
+                    $('#saldo').val(formatSaldo(data.saldo ?? data.saldo_open ?? 0));
                     Swal.close();
                 }).fail(function (xhr) {
                     if (xhr.status === 422) {

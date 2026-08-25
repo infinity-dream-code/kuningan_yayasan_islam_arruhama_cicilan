@@ -17,7 +17,7 @@
         @endisset
         @isset($mainTitle)
             <li class="breadcrumb-item">
-                <a href="{{ route('admin.keuangan.saldo.saldo-virtual-account.index') }}" class="text-hover-primary">{{ $mainTitle }}</a>
+                <a href="{{ $indexUrl ?? route('admin.keuangan.saldo.saldo-virtual-account.index') }}" class="text-hover-primary">{{ $mainTitle }}</a>
             </li>
         @endisset
         <li class="breadcrumb-item active">Data Transaksi</li>
@@ -27,7 +27,7 @@
         <div class="card-header header-elements">
             <h5 class="mb-0 me-2">Data Transaksi</h5>
             <div class="card-header-elements ms-auto">
-                <a href="{{ route('admin.keuangan.saldo.saldo-virtual-account.index') }}" class="btn btn-outline-primary btn-sm">
+                <a href="{{ $indexUrl ?? route('admin.keuangan.saldo.saldo-virtual-account.index') }}" class="btn btn-outline-primary btn-sm">
                     <span class="ri-arrow-left-s-line me-1"></span>
                     Kembali
                 </a>

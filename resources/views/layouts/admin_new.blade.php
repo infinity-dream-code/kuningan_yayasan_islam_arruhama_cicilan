@@ -17,7 +17,7 @@
     <meta name="description" content="Core system ICT "/>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/jpeg" href="{{asset(config('app.logo'))}}"/>
+    @include('partials.favicon')
 
     <!-- Icons -->
 

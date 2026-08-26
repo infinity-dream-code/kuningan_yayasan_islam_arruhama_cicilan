@@ -5,6 +5,9 @@
 
     RewriteEngine On
 
+    # Browser selalu minta /favicon.ico — pakai logo Arruhama, bukan ico sisa clone sekolah lain
+    RewriteRule ^favicon\.ico$ arruhama.jpeg [L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

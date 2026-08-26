@@ -203,8 +203,12 @@
                 const rowData = DT[`${dtOptions.tableId}`].row(rowEl).data();
                 document.getElementById('edit_tagihan').value = rowData.tagihan || '';
                 document.getElementById('edit_id').value = rowData.item_id || '';
-                const vaValue = String(rowData.VA || '') === '94' ? '94' : '93';
-                $('#edit_VA').val(vaValue).trigger('change');
+                const vaValue = String(rowData.VA ?? '').trim();
+                const $editVa = $('#edit_VA');
+                if (vaValue && $editVa.find('option[value="' + vaValue.replace(/"/g, '\\"') + '"]').length === 0) {
+                    $editVa.append(new Option(vaValue, vaValue, true, true));
+                }
+                $editVa.val(vaValue || '').trigger('change');
                 modalEdit.show();
             });
 

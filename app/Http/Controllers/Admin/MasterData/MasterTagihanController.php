@@ -34,7 +34,7 @@ class MasterTagihanController extends Controller
         return [
             ['data' => null, 'name' => 'no', 'className' => 'text-center', 'columnType' => 'no'],
             ['data' => 'tagihan', 'name' => 'Nama Tagihan', 'searchable' => true, 'orderable' => true],
-            ['data' => 'va_label', 'name' => 'VA', 'searchable' => false, 'orderable' => true],
+            ['data' => 'VA', 'name' => 'VA', 'searchable' => true, 'orderable' => true],
             ['data' => 'isINSTALLMENT_label', 'name' => 'Status Dapat Di Cicil', 'searchable' => false, 'orderable' => true],
             [
                 'data' => 'edit',
@@ -72,7 +72,7 @@ class MasterTagihanController extends Controller
                 $sortColumn = $columnName_arr[$columnIndex]['data'];
                 $columnName = match ($sortColumn) {
                     'isINSTALLMENT_label' => 'isINSTALLMENT',
-                    'va_label' => 'VA',
+                    'VA', 'va_label' => 'VA',
                     default => $sortColumn,
                 };
                 $columnSortOrder = $order_arr[0]['dir'] ?? 'asc';
@@ -110,16 +110,13 @@ class MasterTagihanController extends Controller
             $records = $query
                 ->get()
                 ->map(function ($item) {
-                    $va = MultiVa::resolveFromMaster($item);
+                    $vaRaw = trim((string) ($item->VA ?? $item->va ?? ''));
 
                     return [
                         'urut' => $item->urut,
                         'item_id' => $item->urut,
                         'tagihan' => $item->tagihan,
-                        'VA' => $va ?? (string) ($item->VA ?? $item->va ?? ''),
-                        'va_label' => $va
-                            ? MultiVa::optionLabel($va)
-                            : (((string) ($item->VA ?? $item->va ?? '')) !== '' ? (string) ($item->VA ?? $item->va) : '-'),
+                        'VA' => $vaRaw,
                         'isINSTALLMENT' => (int) $item->isINSTALLMENT,
                         'isINSTALLMENT_label' => (int) $item->isINSTALLMENT === 1
                             ? 'BISA DI CICIL'
@@ -189,7 +186,9 @@ class MasterTagihanController extends Controller
                 'tagihan' => strtoupper(trim($request->tagihan)),
                 'kode' => null,
                 'VA' => $va,
-                'isINSTALLMENT' => MultiVa::isInstallment($va),
+                'isINSTALLMENT' => MultiVa::normalize($va) !== null
+                    ? MultiVa::isInstallment($va)
+                    : 0,
             ]);
 
             DB::connection('DATA_MYSQL')->commit();
@@ -208,7 +207,7 @@ class MasterTagihanController extends Controller
             $request->all(),
             [
                 'tagihan' => ['required', 'string', 'max:100'],
-                'VA' => ['required', 'in:93,94'],
+                'VA' => ['required', 'string', 'max:20'],
             ],
             ValidationMessage::messages(),
             ValidationMessage::attributes()
@@ -218,8 +217,9 @@ class MasterTagihanController extends Controller
             return response()->json(['message' => $validator->errors()->first(), 'errors' => $validator->errors()], 422);
         }
 
-        $va = MultiVa::normalize($request->VA);
-        if ($va === null) {
+        $vaRaw = trim((string) $request->VA);
+        $va = MultiVa::normalize($vaRaw) ?? $vaRaw;
+        if ($va === '') {
             return response()->json(['message' => 'Tipe VA tidak valid'], 422);
         }
 
@@ -240,7 +240,9 @@ class MasterTagihanController extends Controller
 
             $row->tagihan = strtoupper(trim($request->tagihan));
             $row->VA = $va;
-            $row->isINSTALLMENT = MultiVa::isInstallment($va);
+            if (MultiVa::normalize($va) !== null) {
+                $row->isINSTALLMENT = MultiVa::isInstallment($va);
+            }
             $row->save();
 
             DB::connection('DATA_MYSQL')->commit();

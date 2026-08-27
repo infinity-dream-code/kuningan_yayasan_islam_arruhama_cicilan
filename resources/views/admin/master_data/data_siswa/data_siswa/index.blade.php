@@ -494,7 +494,8 @@
             pdfColumnWidths: {
                 no: 18,
                 nocust: 48,
-                va_spp: 72,
+                va_open: 72,
+                va_close: 72,
                 va_saku: 72,
                 NUM2ND: 48,
                 nmcust: '*',

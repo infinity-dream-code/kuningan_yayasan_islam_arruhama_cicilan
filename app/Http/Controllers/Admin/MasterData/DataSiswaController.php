@@ -81,8 +81,8 @@ class DataSiswaController extends Controller
             ["data" => "select_reset", "name" => "", "searchable" => false, "orderable" => false, "className" => "text-center", "exportable" => false],
             ["data" => null, "name" => "no", "className" => "text-center", "columnType" => "row", "exportable" => true],
             ["data" => "nocust", "name" => "NIS", "searchable" => true, "orderable" => true, "exportable" => true],
-            ["data" => "va_ipp", "name" => "VA IPP", "searchable" => false, "orderable" => false, "exportable" => true],
-            ["data" => "va_spp", "name" => "VA SPP", "searchable" => false, "orderable" => false, "exportable" => true],
+            ["data" => "va_open", "name" => "VA Open", "searchable" => false, "orderable" => false, "exportable" => true],
+            ["data" => "va_close", "name" => "VA Close", "searchable" => false, "orderable" => false, "exportable" => true],
             ["data" => "NUM2ND", "name" => "No Pendaftaran", "searchable" => true, "orderable" => true, "exportable" => true],
             ["data" => "nmcust", "name" => "NAMA", "searchable" => true, "orderable" => true, "exportable" => true],
             ["data" => "CODE02", "name" => "Unit", "searchable" => true, "orderable" => true, "exportable" => true],
@@ -239,14 +239,8 @@ class DataSiswaController extends Controller
 
         $totalRecordsWithFilter = (clone $filteredQuery)->count("CUSTID");
 
-        $ippMaster = MultiVa::masterByLike('IPP%');
-        $sppMaster = MultiVa::masterByLike('SPP%');
-        $ippPrefix = $ippMaster
-            ? MultiVa::prefixFromMaster($ippMaster)
-            : MultiVa::openPrefix();
-        $sppPrefix = $sppMaster
-            ? MultiVa::prefixFromMaster($sppMaster)
-            : MultiVa::closePrefix();
+        $openPrefix = MultiVa::openPrefix();
+        $closePrefix = MultiVa::closePrefix();
 
         $records = $filteredQuery
             ->orderBy($columnName, $columnSortOrder)
@@ -254,15 +248,15 @@ class DataSiswaController extends Controller
             ->take($length)
             ->select($select)
             ->get()
-            ->map(function ($item) use ($ippPrefix, $sppPrefix) {
+            ->map(function ($item) use ($openPrefix, $closePrefix) {
                 $row = $item->toArray();
                 $nis = trim((string) ($item->nocust ?? ''));
                 $row["item_id"] = $item->CUSTID;
                 $row["select_reset"] = '<input type="checkbox" class="form-check-input reset-android-row" value="' . e((string) $item->CUSTID) . '">';
                 $row["nis"] = $item->nocust;
                 $hasNis = $nis !== '' && $nis !== '-';
-                $row["va_ipp"] = $hasNis ? scctcust::formatVA($ippPrefix, $nis) : '';
-                $row["va_spp"] = $hasNis ? scctcust::formatVA($sppPrefix, $nis) : '';
+                $row["va_open"] = $hasNis ? scctcust::formatVA($openPrefix, $nis) : '';
+                $row["va_close"] = $hasNis ? scctcust::formatVA($closePrefix, $nis) : '';
                 $row["no_pendaftaran"] = $item->NUM2ND;
                 $row["nama"] = $item->nmcust;
                 $row["angkatan"] = $item->DESC04;

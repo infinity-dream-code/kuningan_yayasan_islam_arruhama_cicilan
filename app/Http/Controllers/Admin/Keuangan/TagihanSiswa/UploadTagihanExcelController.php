@@ -293,7 +293,7 @@ class UploadTagihanExcelController extends Controller
                     'BTA' => $bta,
                     'BILLCD' => $billCD,
                     'INSTALLMENT' => 0,
-                    'isINSTALLABLE' => MultiVa::isInstallment($va),
+                    'isINSTALLABLE' => (int) $tagihan->isINSTALLMENT === 1 ? 1 : 0,
                     'va' => $va,
                 ]);
                 $insertedCount++;

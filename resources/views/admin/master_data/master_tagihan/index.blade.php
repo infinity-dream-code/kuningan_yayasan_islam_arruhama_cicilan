@@ -50,7 +50,7 @@
         </div>
         <div class="card-footer">
             <small class="text-muted">
-                Open (93) = bisa dicicil. Close (94) = harus lunas.
+                Nama tagihan tidak bisa diubah. VA dan status cicil hanya berlaku untuk tagihan yang dibuat setelah ini.
             </small>
         </div>
     </div>
@@ -120,10 +120,19 @@
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label required" for="VA">Tipe VA</label>
+                                <label class="form-label required" for="VA">VA</label>
                                 <select class="form-select" name="VA" id="VA" data-control="select2" required>
-                                    <option value="93">93 - Open (bisa dicicil)</option>
-                                    <option value="94">94 - Close (tidak bisa dicicil)</option>
+                                    <option value="93">93 - Open</option>
+                                    <option value="94">94 - Close</option>
+                                </select>
+                                <div class="invalid-feedback" role="alert"><strong></strong></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required" for="isINSTALLMENT">Status Cicil</label>
+                                <select class="form-select" name="isINSTALLMENT" id="isINSTALLMENT"
+                                        data-control="select2" required>
+                                    <option value="1">Bisa dicicil</option>
+                                    <option value="0">Tidak bisa dicicil</option>
                                 </select>
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
@@ -159,17 +168,27 @@
                     <div class="modal-body py-4">
                         <fieldset class="form-fieldset">
                             <div class="mb-3">
-                                <label class="form-label required" for="edit_tagihan">Nama Tagihan</label>
-                                <input type="text" class="form-control" name="tagihan" id="edit_tagihan" autocomplete="off"
-                                       placeholder="Contoh: SPP" required>
+                                <label class="form-label" for="edit_tagihan">Nama Tagihan</label>
+                                <input type="text" class="form-control" id="edit_tagihan" autocomplete="off" readonly
+                                       disabled>
+                                <small class="text-muted">Nama tagihan tidak dapat diubah.</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required" for="edit_VA">VA</label>
+                                <select class="form-select" name="VA" id="edit_VA" data-control="select2" required>
+                                    <option value="93">93 - Open</option>
+                                    <option value="94">94 - Close</option>
+                                </select>
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label required" for="edit_VA">Tipe VA</label>
-                                <select class="form-select" name="VA" id="edit_VA" data-control="select2" required>
-                                    <option value="93">93 - Open (bisa dicicil)</option>
-                                    <option value="94">94 - Close (tidak bisa dicicil)</option>
+                                <label class="form-label required" for="edit_isINSTALLMENT">Status Cicil</label>
+                                <select class="form-select" name="isINSTALLMENT" id="edit_isINSTALLMENT"
+                                        data-control="select2" required>
+                                    <option value="1">Bisa dicicil</option>
+                                    <option value="0">Tidak bisa dicicil</option>
                                 </select>
+                                <small class="text-muted">Berlaku untuk tagihan berikutnya, bukan tagihan yang sudah ada.</small>
                                 <div class="invalid-feedback" role="alert"><strong></strong></div>
                             </div>
                         </fieldset>
@@ -205,10 +224,13 @@
                 document.getElementById('edit_id').value = rowData.item_id || '';
                 const vaValue = String(rowData.VA ?? '').trim();
                 const $editVa = $('#edit_VA');
-                if (vaValue && $editVa.find('option[value="' + vaValue.replace(/"/g, '\\"') + '"]').length === 0) {
+                if (vaValue && $editVa.find('option').filter(function () {
+                    return String($(this).val()) === vaValue;
+                }).length === 0) {
                     $editVa.append(new Option(vaValue, vaValue, true, true));
                 }
                 $editVa.val(vaValue || '').trigger('change');
+                $('#edit_isINSTALLMENT').val(String(Number(rowData.isINSTALLMENT ?? 0) === 1 ? 1 : 0)).trigger('change');
                 modalEdit.show();
             });
 
@@ -247,6 +269,7 @@
                             document.getElementById(form.id).reset();
                             if (isEdit) {
                                 $('#edit_VA').val('93').trigger('change');
+                                $('#edit_isINSTALLMENT').val('1').trigger('change');
                             }
                             successAlert(data.message);
                             dataReload("main_table");

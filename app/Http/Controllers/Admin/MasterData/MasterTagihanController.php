@@ -157,6 +157,7 @@ class MasterTagihanController extends Controller
             [
                 'tagihan' => ['required', 'string', 'max:100'],
                 'VA' => ['required', 'in:93,94'],
+                'isINSTALLMENT' => ['required', 'in:0,1'],
             ],
             ValidationMessage::messages(),
             ValidationMessage::attributes()
@@ -186,9 +187,7 @@ class MasterTagihanController extends Controller
                 'tagihan' => strtoupper(trim($request->tagihan)),
                 'kode' => null,
                 'VA' => $va,
-                'isINSTALLMENT' => MultiVa::normalize($va) !== null
-                    ? MultiVa::isInstallment($va)
-                    : 0,
+                'isINSTALLMENT' => (int) $request->isINSTALLMENT === 1 ? 1 : 0,
             ]);
 
             DB::connection('DATA_MYSQL')->commit();
@@ -206,8 +205,8 @@ class MasterTagihanController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'tagihan' => ['required', 'string', 'max:100'],
                 'VA' => ['required', 'string', 'max:20'],
+                'isINSTALLMENT' => ['required', 'in:0,1'],
             ],
             ValidationMessage::messages(),
             ValidationMessage::attributes()
@@ -228,21 +227,11 @@ class MasterTagihanController extends Controller
             return response()->json(['message' => 'Data tagihan tidak ditemukan'], 422);
         }
 
-        $duplicate = mst_tagihan::where('tagihan', strtoupper(trim($request->tagihan)))
-            ->where('urut', '!=', $row->urut)
-            ->first();
-        if ($duplicate) {
-            return response()->json(['message' => 'Nama tagihan sudah ada'], 422);
-        }
-
         try {
             DB::connection('DATA_MYSQL')->beginTransaction();
 
-            $row->tagihan = strtoupper(trim($request->tagihan));
             $row->VA = $va;
-            if (MultiVa::normalize($va) !== null) {
-                $row->isINSTALLMENT = MultiVa::isInstallment($va);
-            }
+            $row->isINSTALLMENT = (int) $request->isINSTALLMENT === 1 ? 1 : 0;
             $row->save();
 
             DB::connection('DATA_MYSQL')->commit();

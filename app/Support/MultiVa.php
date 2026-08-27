@@ -74,26 +74,18 @@ class MultiVa
 
     public static function resolveFromMaster(object $tagihan): ?string
     {
-        $va = self::normalize($tagihan->VA ?? $tagihan->va ?? null);
-        if ($va !== null) {
-            return $va;
-        }
-
-        if (!isset($tagihan->isINSTALLMENT) || $tagihan->isINSTALLMENT === null || $tagihan->isINSTALLMENT === '') {
-            return null;
-        }
-
-        return (int) $tagihan->isINSTALLMENT === 1 ? self::OPEN : self::CLOSE;
+        return self::normalize($tagihan->VA ?? $tagihan->va ?? null);
     }
 
     public static function masterOptionText(object $item): string
     {
         $name = trim((string) ($item->tagihan ?? ''));
-        $va = self::resolveFromMaster($item);
+        $raw = trim((string) ($item->VA ?? $item->va ?? ''));
+        $va = self::normalize($raw);
         $suffix = match ($va) {
-            self::OPEN => 'Open',
-            self::CLOSE => 'Close',
-            default => '-',
+            self::OPEN => '93 - Open',
+            self::CLOSE => '94 - Close',
+            default => ($raw !== '' ? $raw : '-'),
         };
 
         return $name === '' ? $suffix : "{$name} ({$suffix})";
@@ -175,14 +167,14 @@ class MultiVa
 
     public static function requireFromMaster(mst_tagihan $tagihan): string
     {
-        $va = self::resolveFromMaster($tagihan);
-        if ($va === null) {
+        $raw = trim((string) ($tagihan->VA ?? $tagihan->va ?? ''));
+        if ($raw === '') {
             throw new RuntimeException(
-                'Jenis tagihan "' . $tagihan->tagihan . '" belum diset VA Open (93) atau Close (94).'
+                'Jenis tagihan "' . $tagihan->tagihan . '" belum diset VA.'
             );
         }
 
-        return $va;
+        return self::normalize($raw) ?? $raw;
     }
 
     public static function custSaldo(string|int|null $custId, string $reffBank): int

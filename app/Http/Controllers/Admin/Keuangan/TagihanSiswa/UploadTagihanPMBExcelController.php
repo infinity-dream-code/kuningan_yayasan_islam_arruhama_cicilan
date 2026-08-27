@@ -222,7 +222,7 @@ class UploadTagihanPMBExcelController extends Controller
                     'BTA' => $bta,
                     'BILLCD' => date('Y') . '/i' . date('m') . '-' . ($urut + 1),
                     'INSTALLMENT' => 0,
-                    'isINSTALLABLE' => MultiVa::isInstallment($va),
+                    'isINSTALLABLE' => (int) $tagihan->isINSTALLMENT === 1 ? 1 : 0,
                     'va' => $va,
                 ]);
             }

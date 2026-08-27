@@ -18,9 +18,7 @@ class scctcust extends Model
 
     public static function vaPrefix(): string
     {
-        $raw = preg_replace('/\D/', '', (string) config('app.nova', '797783'));
-
-        return $raw !== '' ? $raw : '797783';
+        return \App\Support\MultiVa::openPrefix();
     }
 
     public static function vaTotalLength(): int
@@ -40,7 +38,32 @@ class scctcust extends Model
 
     public static function showVASpp($nis): string
     {
-        return self::showVA($nis);
+        $spp = \App\Support\MultiVa::masterByLike('SPP%');
+        if (!$spp) {
+            return \App\Support\MultiVa::formatNoVa($nis, \App\Support\MultiVa::CLOSE);
+        }
+
+        return \App\Support\MultiVa::formatNoVa(
+            $nis,
+            $spp->VA ?? $spp->va ?? null,
+            $spp->isINSTALLMENT ?? 0,
+            $spp->tagihan ?? null
+        );
+    }
+
+    public static function showVAIpp($nis): string
+    {
+        $ipp = \App\Support\MultiVa::masterByLike('IPP%');
+        if (!$ipp) {
+            return \App\Support\MultiVa::formatNoVa($nis, \App\Support\MultiVa::OPEN);
+        }
+
+        return \App\Support\MultiVa::formatNoVa(
+            $nis,
+            $ipp->VA ?? $ipp->va ?? null,
+            $ipp->isINSTALLMENT ?? 1,
+            $ipp->tagihan ?? null
+        );
     }
 
     public static function showVASaku($nis): string
@@ -48,8 +71,12 @@ class scctcust extends Model
         return self::showVA($nis);
     }
 
-    public static function showVA($nis): string
+    public static function showVA($nis, mixed $va = null, mixed $isInstallment = null, ?string $billName = null): string
     {
+        if ($va !== null || $isInstallment !== null || $billName !== null) {
+            return \App\Support\MultiVa::formatNoVa($nis, $va, $isInstallment, $billName);
+        }
+
         return self::formatVA(self::vaPrefix(), $nis);
     }
 

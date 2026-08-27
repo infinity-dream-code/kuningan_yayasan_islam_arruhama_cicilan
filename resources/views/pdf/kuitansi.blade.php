@@ -4,7 +4,9 @@
     @php
         $nis = $siswa->NOCUST ?? null;
         $hasNis = $nis && $nis !== '-';
-        $nova = $hasNis ? \App\Models\scctcust::showVA($nis) : null;
+        $nova = $hasNis
+            ? \App\Support\MultiVa::formatNoVaFromBills($nis, $tagihans ?? [])
+            : \App\Support\MultiVa::formatNoVaFromBills($siswa->NUM2ND ?? '', $tagihans ?? []);
         $ortu = $siswa->GENUS ?? '-';
         $total = collect($tagihans ?? [])->sum('BILLAM');
     @endphp

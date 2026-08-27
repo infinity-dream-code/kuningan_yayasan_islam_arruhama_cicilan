@@ -11,6 +11,8 @@ class MultiVa
     public const OPEN = '93';
     public const CLOSE = '94';
 
+    private static ?\Illuminate\Support\Collection $masters = null;
+
     public static function openPrefix(): string
     {
         $raw = preg_replace('/\D/', '', (string) config('app.va_open', '7797793'));
@@ -188,5 +190,133 @@ class MultiVa
             ->first();
 
         return (int) ($row->SALDO ?? 0);
+    }
+
+    public static function masters(): \Illuminate\Support\Collection
+    {
+        if (self::$masters === null) {
+            self::$masters = mst_tagihan::query()->orderBy('urut')->get();
+        }
+
+        return self::$masters;
+    }
+
+    public static function masterByBillName(?string $billName): ?object
+    {
+        $key = strtoupper(trim((string) $billName));
+        if ($key === '') {
+            return null;
+        }
+
+        return self::masters()->first(
+            fn ($row) => strtoupper(trim((string) $row->tagihan)) === $key
+        );
+    }
+
+    public static function masterByLike(string $prefix): ?object
+    {
+        $needle = strtoupper(trim($prefix, '%'));
+        if ($needle === '') {
+            return null;
+        }
+
+        return self::masters()->first(
+            fn ($row) => str_starts_with(strtoupper(trim((string) $row->tagihan)), $needle)
+        );
+    }
+
+    /**
+     * Prefix bank: VA 93/94 (atau nomor lengkap) dulu, lalu cicil di master/tagihan.
+     * VA lama (mis. 81) + non-cicil → Close 7797794; cicil → Open 7797793.
+     */
+    public static function prefixFromContext(mixed $va = null, mixed $isInstallment = null, ?string $billName = null): string
+    {
+        $normalized = self::normalize($va);
+        if ($normalized !== null) {
+            return self::prefix($normalized);
+        }
+
+        $mst = $billName ? self::masterByBillName($billName) : null;
+        if ($mst) {
+            $normalized = self::normalize($mst->VA ?? $mst->va ?? null);
+            if ($normalized !== null) {
+                return self::prefix($normalized);
+            }
+            if ($isInstallment === null || $isInstallment === '') {
+                $isInstallment = $mst->isINSTALLMENT ?? null;
+            }
+        }
+
+        if ($isInstallment !== null && $isInstallment !== '') {
+            return (int) $isInstallment === 1 ? self::openPrefix() : self::closePrefix();
+        }
+
+        return self::openPrefix();
+    }
+
+    public static function prefixFromMaster(?object $tagihan): string
+    {
+        if (!$tagihan) {
+            return self::openPrefix();
+        }
+
+        return self::prefixFromContext(
+            $tagihan->VA ?? $tagihan->va ?? null,
+            $tagihan->isINSTALLMENT ?? null
+        );
+    }
+
+    public static function formatNoVa(mixed $nis, mixed $va = null, mixed $isInstallment = null, ?string $billName = null): string
+    {
+        $nis = trim((string) $nis);
+        if ($nis === '' || $nis === '-') {
+            return '';
+        }
+
+        return \App\Models\scctcust::formatVA(
+            self::prefixFromContext($va, $isInstallment, $billName),
+            $nis
+        );
+    }
+
+    public static function formatNoVaFromBill(mixed $nis, object $bill): string
+    {
+        $source = trim((string) $nis);
+        if ($source === '' || $source === '-') {
+            $source = trim((string) ($bill->NUM2ND ?? $bill->NOCUST ?? $bill->nocust ?? ''));
+        }
+
+        return self::formatNoVa(
+            $source,
+            $bill->va ?? $bill->VA ?? null,
+            $bill->isINSTALLABLE ?? null,
+            $bill->BILLNM ?? $bill->tagihan ?? null
+        );
+    }
+
+    public static function formatNoVaFromBills(mixed $nis, mixed $bills): string
+    {
+        $formatted = collect($bills ?? [])
+            ->map(function ($bill) use ($nis) {
+                $bill = is_array($bill) ? (object) $bill : $bill;
+
+                return is_object($bill) ? self::formatNoVaFromBill($nis, $bill) : '';
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $formatted->implode(' / ');
+    }
+
+    public static function formatNoVaBoth(mixed $nis): string
+    {
+        $open = self::formatNoVa($nis, self::OPEN);
+        $close = self::formatNoVa($nis, self::CLOSE);
+        if ($open !== '' && $close !== '' && $open !== $close) {
+            return $open . ' / ' . $close;
+        }
+
+        return $open !== '' ? $open : $close;
     }
 }

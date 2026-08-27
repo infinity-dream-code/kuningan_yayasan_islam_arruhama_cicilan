@@ -901,14 +901,9 @@
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
             const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
-            const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
-            const showVA = (nis) => typeof formatNoVA === 'function'
-                ? formatNoVA(nis, APP_VA_PREFIX)
-                : (() => {
-                    const digits = String(nis ?? '').replace(/\D/g, '');
-                    if (!digits) return '';
-                    return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
-                })();
+            const showVA = (nis, tagihans) => typeof novaFromBills === 'function'
+                ? novaFromBills(nis, tagihans)
+                : (typeof showVABoth === 'function' ? showVABoth(nis) : '');
 
             async function generatePdf(title, bodyContent, unit_logo = false) {
                 try {
@@ -1324,7 +1319,7 @@
 
                 const mainTable = [
                     [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : siswa.NUM2ND), 'Unit', ': ' + siswa.CODE02],
-                    [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
+                    [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans || []) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
                     ['Nama ', ': ' + siswa.nmcust, 'Ayah', ': ' + (siswa.GENUS ?? '-')],
                     ['Metode Bayar', ': ' + metodeLabel, 'Ibu', ': ' + (siswa.GENUS1 ?? '')],
                 ]
@@ -1563,7 +1558,7 @@
                             text: h,
                             border: [false, false, false, false]
                         })),
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + siswa.DESC02 + ' '+ siswa.DESC03].map(h => ({
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans || []) : ''), 'Kelas', ': ' + siswa.DESC02 + ' '+ siswa.DESC03].map(h => ({
                             text: h,
                             border: [false, false, false, false]
                         })),

@@ -491,7 +491,7 @@
 
     <script src="{{asset('main/libs/select2/select2.js')}}"></script>
     <script src="{{asset('main/libs/datatables-bs5/datatables-bootstrap5.js')}}"></script>
-    <script src="{{asset('js/va-format.js')}}?v=20260619"></script>
+    <script src="{{asset('js/va-format.js')}}?v=20260827-multiva"></script>
     <script src="{{asset('js/datatableCustom/Datatable-0-4.js')}}?v=20260724-excel-total-fix"></script>
     <script>
         window.DATA_TAGIHAN_BOOT = {
@@ -1281,15 +1281,9 @@
             const userName = @json(Auth::user()?->name ?? Auth::user()?->users ?? '');
             const domisili = "{{ config('app.domisili') }}";
             const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
-            const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
-            const showVA = (nis) => typeof formatNoVA === 'function'
-                ? formatNoVA(nis, APP_VA_PREFIX)
-                : (() => {
-                    const digits = String(nis ?? '').replace(/\D/g, '');
-                    if (!digits) return '';
-                    const padLen = 16 - APP_VA_PREFIX.length;
-                    return APP_VA_PREFIX + digits.padStart(padLen, '0');
-                })();
+            const showVA = (nis, tagihans) => typeof novaFromBills === 'function'
+                ? novaFromBills(nis, tagihans)
+                : (typeof showVABoth === 'function' ? showVABoth(nis) : '');
 
             async function generatePdf(title, bodyContent, unit_logo = false) {
                 try {
@@ -1562,7 +1556,7 @@
                             text: h,
                             border: [false, false, false, false]
                         })),
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + siswa.DESC02 + ' '+ siswa.DESC03].map(h => ({
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans || []) : ''), 'Kelas', ': ' + siswa.DESC02 + ' '+ siswa.DESC03].map(h => ({
                             text: h,
                             border: [false, false, false, false]
                         })),

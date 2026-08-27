@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
 use App\Support\MetodeBayarHelper;
+use App\Support\MultiVa;
 use App\Support\TagihanPaymentReversal;
 use Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -1245,10 +1246,18 @@ class DataPenerimaanController extends Controller
                 'scctbill.PAIDST',
                 'scctbill.FIDBANK',
                 'scctbill.FUrutan',
+                'scctbill.va',
+                'scctbill.isINSTALLABLE',
+                'scctcust.NOCUST',
             ])
             ->orderBy('scctbill.FUrutan', 'asc')
             ->orderBy('scctbill.PAIDDT', 'desc')
             ->get()
+            ->map(function ($item) {
+                $item->NOVA = MultiVa::formatNoVaFromBill($item->NOCUST ?? null, $item);
+
+                return $item;
+            })
             ->values();
 
         if ($tagihans->isEmpty()) {

@@ -799,14 +799,9 @@
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
             const tanggalSekarang = "{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM YYYY') }}";
-            const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
-            const showVA = (nis) => typeof formatNoVA === 'function'
-                ? formatNoVA(nis, APP_VA_PREFIX)
-                : (() => {
-                    const digits = String(nis ?? '').replace(/\D/g, '');
-                    if (!digits) return '';
-                    return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
-                })();
+            const showVA = (nis, tagihans) => typeof novaFromBills === 'function'
+                ? novaFromBills(nis, tagihans)
+                : (typeof showVABoth === 'function' ? showVABoth(nis) : '');
 
             function getContentWidth(pageSize = 'A4', orientation = 'portrait', margins = [30, 30, 30, 30]) {
                 const sizes = {
@@ -1045,7 +1040,7 @@
 
                     const mainTable = [
                         [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : siswa.NUM2ND), 'Unit', ': ' + siswa.CODE02],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans || []) : ''), 'Kelas', ': ' + (siswa.DESC02 ?? '') + ' ' + (siswa.DESC03 ?? '')],
                         ['Nama ', ': ' + namaSiswa, 'Orang Tua', ': ' + (siswa.GENUS ?? siswa.genus ?? '-')],
                         ['Metode Bayar', ': ' + metodeLabel, '', ''],
                     ]
@@ -1146,7 +1141,7 @@
 
                     const mainTable = [
                         [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : siswa.NUM2ND), 'Unit', ': ' + siswa.CODE02],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : ''), 'Kelas', ': ' + siswa.DESC02 + ' ' + siswa.DESC03],
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans || []) : ''), 'Kelas', ': ' + siswa.DESC02 + ' ' + siswa.DESC03],
                         ['Nama ', ': ' + siswa.NMCUST, 'Orang Tua', ': ' + (siswa.GENUS ?? siswa.genus ?? '-')],
                         ['', '', '', ''],
                     ]

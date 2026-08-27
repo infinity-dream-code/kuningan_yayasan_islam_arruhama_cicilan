@@ -134,6 +134,7 @@ class ManualPembayaranController extends Controller
                 'scctbill.NOREFF',
                 'scctbill.FUrutan',
                 'scctbill.va',
+                'scctbill.isINSTALLABLE',
                 'scctcust.CUSTID',
                 'scctcust.CODE02',
                 'scctcust.DESC02',
@@ -167,10 +168,9 @@ class ManualPembayaranController extends Controller
                     $item->nmcust = $item->NMCUST;
                     $item->kelas_label = trim(($item->DESC02 ?? '') . ' ' . ($item->DESC03 ?? ''));
                     $nis = $item->NOCUST;
-                    $va = MultiVa::resolveFromBill($item);
                     $vaSource = ($nis && $nis !== '-') ? $nis : $item->NUM2ND;
                     $item->NOVA = $vaSource
-                        ? scctcust::formatVA(MultiVa::prefix($va ?? MultiVa::OPEN), $vaSource)
+                        ? MultiVa::formatNoVaFromBill($vaSource, $item)
                         : '-';
                     $item->PAYMENTLEFT = $this->resolvePaymentLeft($item);
                     $item->sisa_bayar = $item->PAYMENTLEFT;
@@ -739,7 +739,9 @@ class ManualPembayaranController extends Controller
             return response()->json([
                 'message' => 'Nomor VA berhasil diperbarui',
                 'nocust' => $nocust,
-                'nova' => scctcust::showVA($nocust),
+                'nova' => MultiVa::formatNoVaBoth($nocust),
+                'nova_open' => MultiVa::formatNoVa($nocust, MultiVa::OPEN),
+                'nova_close' => MultiVa::formatNoVa($nocust, MultiVa::CLOSE),
             ], 200);
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Gagal memperbarui nomor VA', 'error' => $e->getMessage()], 422);
@@ -805,6 +807,10 @@ class ManualPembayaranController extends Controller
             $row['BILL_NOREFF'] = $billNoreff;
             $row['PAIDDT'] = $paidDt;
             $row['NOMINAL_BAYAR'] = $nominalBayar;
+            $row['NOVA'] = MultiVa::formatNoVaFromBill(
+                $tagihan->NOCUST ?? $row['NOCUST'] ?? null,
+                $tagihan
+            );
 
             return $row;
         })->values()->all();

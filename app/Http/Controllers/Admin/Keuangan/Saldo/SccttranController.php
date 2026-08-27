@@ -7,6 +7,7 @@ use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use App\Models\mst_thn_aka;
 use App\Models\scctcust;
+use App\Support\MultiVa;
 use App\Models\sccttran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -266,9 +267,9 @@ class SccttranController extends Controller
             ->get()
             ->map(function ($item) {
                 if ($item->NOCUST && $item->NOCUST != '-') {
-                    $NOVA = scctcust::showVA($item->NOCUST);
+                    $NOVA = MultiVa::formatNoVaBoth($item->NOCUST);
                 } else {
-                    $NOVA = scctcust::showVA($item->NUM2ND);
+                    $NOVA = MultiVa::formatNoVaBoth($item->NUM2ND);
                 }
                 $item->NOVA = $NOVA;
                 $item->NOMINAL = (int) ($item->KREDIT ?? 0);

@@ -9,6 +9,7 @@ use App\Models\mst_tagihan;
 use App\Models\mst_thn_aka;
 use App\Models\scctbill;
 use App\Models\scctcust;
+use App\Support\MultiVa;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -86,11 +87,10 @@ class CekPelunasanController extends Controller
                 return response()->json(['message' => 'Tagihan Tidak Ditemukan'], 422);
             }
 
-            $nova = ($siswa->NOCUST && $siswa->NOCUST !== '-')
-                ? scctcust::showVA($siswa->NOCUST)
-                : (($siswa->NUM2ND && $siswa->NUM2ND !== '-')
-                    ? scctcust::showVA($siswa->NUM2ND)
-                    : null);
+            $nova = MultiVa::formatNoVaFromBills(
+                $siswa->NOCUST ?: $siswa->NUM2ND,
+                $tagihans
+            );
 
             $pdf = Pdf::loadView('cetak.kartu-siswa', [
                 'tagihans' => $tagihans,

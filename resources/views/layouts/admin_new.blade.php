@@ -301,6 +301,12 @@
 <script src="{{asset('js/main.js')}}"></script>
 
 <script src="{{asset('js/alerts.min.js')}}"></script>
+<script>
+    window.APP_VA_OPEN = @json((string) config('app.va_open', '7797793'));
+    window.APP_VA_CLOSE = @json((string) config('app.va_close', '7797794'));
+    window.APP_VA_PREFIX = window.APP_VA_OPEN;
+</script>
+<script src="{{asset('js/va-format.js')}}?v=20260827-multiva"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css"/>
 
 <style>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Keuangan\TagihanSiswa;
 
 use App\Http\Controllers\Controller;
 use App\Support\PerNisMatrixPdf;
+use App\Support\MultiVa;
 use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use App\Models\mst_tagihan;
@@ -492,6 +493,8 @@ class RekapTagihanController extends Controller
             'scctbill.FIDBANK',
             'scctbill.FUrutan',
             'scctbill.FUrutan as Urutan',
+            'scctbill.va',
+            'scctbill.isINSTALLABLE',
             'scctcust.CODE02',
             'scctcust.DESC01',
             'scctcust.DESC02',
@@ -551,7 +554,9 @@ class RekapTagihanController extends Controller
         $records->map(function ($item, $index) {
             $item->item_id = Crypt::encrypt($item['AA']);
             $item->CUSTID = Crypt::encrypt($item['CUSTID']);
-            $item->NOVA = ($item->NOCUST && $item->NOCUST != '-') ? scctcust::showVA($item->NOCUST) : null;
+            $item->NOVA = ($item->NOCUST && $item->NOCUST != '-')
+                ? MultiVa::formatNoVaFromBill($item->NOCUST, $item)
+                : null;
             // Pastikan kolom urutan selalu tersedia untuk DataTable dan PDF.
             $urut = blank($item->FUrutan) ? ($index + 1) : $item->FUrutan;
             $item->FUrutan = (string) $urut;
@@ -602,9 +607,10 @@ class RekapTagihanController extends Controller
             if (empty($tagihans)) {
                 return response()->json(['message' => 'Tagihan Tidak Ditemukan'], 422);
             }
-            $nova = ($siswa->NOCUST && $siswa->NOCUST != '-')
-                ? scctcust::showVA($siswa->NOCUST)
-                : null;
+            $nova = MultiVa::formatNoVaFromBills(
+                $siswa->NOCUST ?: $siswa->NUM2ND,
+                $tagihans
+            );
             $pdf = Pdf::loadView('cetak.kartu-siswa', [
                 'tagihans' => $tagihans,
                 'siswa' => $siswa,

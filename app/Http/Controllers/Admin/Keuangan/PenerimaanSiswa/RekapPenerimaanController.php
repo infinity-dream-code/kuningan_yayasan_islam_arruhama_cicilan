@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Keuangan\PenerimaanSiswa;
 use App\Http\Controllers\Controller;
 use App\Support\PerNisMatrixPdf;
 use App\Support\MetodeBayarHelper;
+use App\Support\MultiVa;
 use App\Models\mst_kelas;
 use App\Models\mst_tagihan;
 use App\Models\mst_thn_aka;
@@ -161,7 +162,9 @@ class RekapPenerimaanController extends Controller
         $item->REMARK = trim((string) ($item->METODE ?? '')) ?: '-';
         $item->NOREFF = trim((string) ($item->NOREFF ?? '')) ?: '-';
         $item->kelas_label = trim(($item->DESC02 ?? '') . ' ' . ($item->DESC03 ?? ''));
-        $item->NOVA = ($item->NOCUST && $item->NOCUST != '-') ? scctcust::showVA($item->NOCUST) : '-';
+        $item->NOVA = ($item->NOCUST && $item->NOCUST != '-')
+            ? MultiVa::formatNoVaFromBill($item->NOCUST, $item)
+            : '-';
 
         if (!$item->NOCUST || $item->NOCUST == '-') {
             $item->NOCUST = null;
@@ -267,8 +270,12 @@ class RekapPenerimaanController extends Controller
             $tagihans = json_decode(json_encode($tagihans), true);
             $tagihans = $tagihans['original']['data'];
             if (!$tagihans) return response()->json(['message' => 'Tagihan Tidak Ditemukan'], 422);
-//            dd($tagihans, $siswa);
-            $pdf = Pdf::loadView('cetak.kartu-siswa', ['tagihans' => $tagihans, 'siswa' => $siswa]);
+            $nova = MultiVa::formatNoVaFromBills($siswa->NOCUST ?: $siswa->NUM2ND, $tagihans);
+            $pdf = Pdf::loadView('cetak.kartu-siswa', [
+                'tagihans' => $tagihans,
+                'siswa' => $siswa,
+                'nova' => $nova,
+            ]);
             return $pdf->download('kartu-siswa.pdf');
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Tagihan Tidak Ditemukan', 'error' => $e], 422);
@@ -526,6 +533,8 @@ class RekapPenerimaanController extends Controller
                 'scctbill.FUrutan',
                 'scctbill.NOREFF as BILL_NOREFF',
                 'scctbill.FIDBANK as BILL_FIDBANK',
+                'scctbill.va',
+                'scctbill.isINSTALLABLE',
                 'scctcust.NMCUST',
                 'scctcust.NOCUST',
                 'scctcust.DESC01',

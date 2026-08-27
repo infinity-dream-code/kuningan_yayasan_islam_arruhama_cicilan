@@ -9,6 +9,7 @@ use App\Models\mst_thn_aka;
 use App\Models\scctbill;
 use App\Models\scctbill_detail;
 use App\Models\scctcust;
+use App\Support\MultiVa;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -148,6 +149,8 @@ class ExportTagihanController extends Controller
             'scctbill.BTA',
             'scctbill.FIDBANK',
             'scctbill.FUrutan',
+            'scctbill.va',
+            'scctbill.isINSTALLABLE',
             'scctcust.CODE02',
             'scctcust.DESC02',
             'scctcust.NUM2ND',
@@ -197,7 +200,9 @@ class ExportTagihanController extends Controller
             ->map(function ($item, $index) {
                 $item->item_id = $item['AA'];
                 $item->CUSTID = $item['CUSTID'];
-                $item->NOVA = ($item->NOCUST && $item->NOCUST != '-') ? scctcust::showVA($item->NOCUST) : null;
+                $item->NOVA = ($item->NOCUST && $item->NOCUST != '-')
+                    ? MultiVa::formatNoVaFromBill($item->NOCUST, $item)
+                    : null;
                 if (!$item->NOCUST || $item->NOCUST == '-') $item->NOCUST = null;
                 if (!$item->NUM2ND || $item->NUM2ND == '-') $item->NUM2ND = null;
                 $item->print = true;

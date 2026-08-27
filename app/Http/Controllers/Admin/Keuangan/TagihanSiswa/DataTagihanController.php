@@ -15,6 +15,7 @@ use App\Models\ValidationMessage;
 use App\Support\CacheHandler;
 use App\Support\FilterHandler;
 use App\Support\TagihanPaymentReversal;
+use App\Support\MultiVa;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -455,6 +456,8 @@ class DataTagihanController extends Controller
                     'scctbill.FIDBANK',
                     'scctbill.FUrutan',
                     'scctbill.TRANSNO',
+                    'scctbill.va',
+                    'scctbill.isINSTALLABLE',
                     'scctcust.CODE02',
                     'scctcust.DESC02',
                 ])
@@ -647,6 +650,8 @@ class DataTagihanController extends Controller
             'scctbill.PAIDST',
             'scctbill.PAIDDT',
             'scctbill.INSTALLMENT',
+            'scctbill.va',
+            'scctbill.isINSTALLABLE',
             'scctbill.TRANSNO as BILL_TRANSNO',
             'scctbill.BTA',
             'scctbill.FIDBANK',
@@ -767,7 +772,9 @@ class DataTagihanController extends Controller
                     'CUSTID' => $get('CUSTID'),
                     'NOCUST' => ($nocust && $nocust !== '-') ? $nocust : null,
                     'NUM2ND' => ($num2nd && $num2nd !== '-') ? $num2nd : null,
-                    'NOVA' => ($nocust && $nocust !== '-') ? scctcust::showVA($nocust) : null,
+                    'NOVA' => ($nocust && $nocust !== '-')
+                        ? MultiVa::formatNoVaFromBill($nocust, $item)
+                        : null,
                     'NMCUST' => $get('NMCUST'),
                     'CODE02' => $get('CODE02'),
                     'DESC02' => $get('DESC02'),

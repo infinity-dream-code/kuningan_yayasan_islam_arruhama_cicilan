@@ -751,13 +751,10 @@
             const tandaTangan = @json($tanda_tangan);
             const userName = "{{ Auth::user()->name }}";
             const domisili = "{{ config('app.domisili') }}";
-            const APP_VA_PREFIX = @json((string) (config('app.nova') ?: '797783'));
-
-            const showVA = function (nis) {
-                if (typeof formatNoVA === 'function') return formatNoVA(nis, APP_VA_PREFIX);
-                const digits = String(nis || '').replace(/\D/g, '');
-                if (!digits) return '';
-                return APP_VA_PREFIX + digits.padStart(16 - APP_VA_PREFIX.length, '0');
+            const showVA = function (nis, tagihans) {
+                if (typeof novaFromBills === 'function') return novaFromBills(nis, tagihans);
+                if (typeof showVABoth === 'function') return showVABoth(nis);
+                return '';
             };
 
             const modalEditNova = new bootstrap.Modal(document.getElementById('modal-edit-nova'));
@@ -929,7 +926,7 @@
 
                     const mainTable = [
                         [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : (siswa.NUM2ND || '-')), 'Unit', ': ' + (siswa.CODE02 || '-')],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : '-'), 'Kelas', ': ' + (siswa.DESC02 || '') + ' ' + (siswa.DESC03 || '')],
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans) : '-'), 'Kelas', ': ' + (siswa.DESC02 || '') + ' ' + (siswa.DESC03 || '')],
                         ['Nama ', ': ' + namaSiswa, 'Orang Tua', ': ' + ortu],
                         ['Metode Bayar', ': ' + metodeLabel, '', ''],
                     ];
@@ -1005,7 +1002,7 @@
 
                     const mainTable = [
                         [(nocust ? 'NIS ' : 'No. Pendaftaran'), ': ' + (nocust ? nocust : (siswa.NUM2ND || '-')), 'Unit', ': ' + (siswa.CODE02 || '-')],
-                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust) : '-'), 'Kelas', ': ' + (siswa.DESC02 || '') + ' ' + (siswa.DESC03 || '')],
+                        [(nocust ? 'No. VA ' : '-'), ': ' + (nocust ? showVA(nocust, data.tagihans) : '-'), 'Kelas', ': ' + (siswa.DESC02 || '') + ' ' + (siswa.DESC03 || '')],
                         ['Nama ', ': ' + (siswa.NMCUST || '-'), 'Orang Tua', ': ' + ortu],
                         ['', '', '', ''],
                     ];

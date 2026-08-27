@@ -7,6 +7,7 @@ use App\Models\mst_kelas;
 use App\Models\mst_sekolah;
 use App\Models\mst_thn_aka;
 use App\Models\scctcust;
+use App\Support\MultiVa;
 use App\Models\sccttran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -133,9 +134,9 @@ class SaldoVirtualSakuController extends Controller
 
             if ($data['siswa']) {
                 if ($data['siswa']->NOCUST && $data['siswa']->NOCUST != '-') {
-                    $NOVA = scctcust::showVA($data['siswa']->NOCUST);
+                    $NOVA = MultiVa::formatNoVaBoth($data['siswa']->NOCUST);
                 } else {
-                    $NOVA = scctcust::showVA($data['siswa']->NUM2ND);
+                    $NOVA = MultiVa::formatNoVaBoth($data['siswa']->NUM2ND);
                 }
                 $data['siswa']->NOVA = $NOVA;
 
@@ -335,9 +336,9 @@ class SaldoVirtualSakuController extends Controller
                 $item->item_id = $item->CUSTID;
                 $item->print = true;
                 if ($item->NOCUST && $item->NOCUST != '-') {
-                    $NOVA = scctcust::showVA($item->NOCUST);
+                    $NOVA = MultiVa::formatNoVaBoth($item->NOCUST);
                 } else {
-                    $NOVA = scctcust::showVA($item->NUM2ND);
+                    $NOVA = MultiVa::formatNoVaBoth($item->NUM2ND);
                 }
                 $item->NOVA = $NOVA;
                 unset($item->CUSTID);

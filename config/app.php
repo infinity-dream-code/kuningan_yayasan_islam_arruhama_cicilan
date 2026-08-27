@@ -23,7 +23,7 @@ return [
     'email' => env('APP_EMAIL', 'ypisabkho@gmail.com'),
     'telepon' => env('APP_TELEPON', 'SIKEU'),
     'domisili' => env('APP_DOMISILI', 'Kuningan'),
-    'nova' => env('APP_NOVA') ?: '797783',
+    'nova' => env('APP_NOVA') ?: env('APP_VA_OPEN', '7797793'),
     'va_open' => env('APP_VA_OPEN', '7797793'),
     'va_close' => env('APP_VA_CLOSE', '7797794'),
     'biaya_admin' => env('BIAYA_ADMIN', 0),

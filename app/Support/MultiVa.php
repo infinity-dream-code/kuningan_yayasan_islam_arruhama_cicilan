@@ -142,6 +142,13 @@ class MultiVa
         return "BuilderPaymentBill_BankBayar_MultiVAPerTagihan{$va}";
     }
 
+    public static function cancelProcedure(string $reffBank): string
+    {
+        $va = self::normalize($reffBank) ?? self::OPEN;
+
+        return "CancelPaymentSaldo_MultiVAPerTagihan{$va}";
+    }
+
     public static function vaForBillName(?string $billName, mixed $existingVa = null): ?string
     {
         $fromExisting = self::normalize($existingVa);

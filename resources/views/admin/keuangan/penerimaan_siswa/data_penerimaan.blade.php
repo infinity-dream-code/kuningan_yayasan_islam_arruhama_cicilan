@@ -166,7 +166,7 @@
                                 <label for="filter[nama]" class="col-sm-4 col-form-label text-capitalize form-label">nama</label>
                                 <div class="col">
                                     <input type="text" class="form-control form-control"
-                                           placeholder="Masukkan nama siswa" id="filter[nama]" name="filter[nama]">
+                                           placeholder="Ketik nama siswa" id="filter[nama]" name="filter[nama]">
                                 </div>
                             </div>
 

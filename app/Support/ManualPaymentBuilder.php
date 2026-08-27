@@ -35,7 +35,12 @@ class ManualPaymentBuilder
                     'Tagihan belum memiliki VA Open/Close. Set tipe VA di Master Tagihan.'
                 );
             }
-            $this->callBuilderPaymentBill($aa, $nominal, MultiVa::paymentFunction($va));
+            $this->callBuilderPaymentBill(
+                $aa,
+                $nominal,
+                MultiVa::paymentFunction($va),
+                MultiVa::paymentFunctionLegacy($va)
+            );
             return;
         }
 
@@ -51,7 +56,7 @@ class ManualPaymentBuilder
     }
 
     /**
-     * BuilderPaymentCash(v_CUSTID, p_FIDBANK, p_User, p_Date, p_BILLCD, p_AA, p_Payment)
+     * BuilderPaymentCash_MultiVAPerTagihan(v_CUSTID, p_FIDBANK, p_User, p_Date, p_BILLCD, p_AA, p_Payment)
      * p_Date format: YYYYMMDD (8 karakter)
      */
     private function callBuilderPaymentCash(
@@ -63,18 +68,8 @@ class ManualPaymentBuilder
         string $aa,
         int $nominal
     ): void {
-        Log::info('manual-payment.builder.call', [
-            'function' => 'BuilderPaymentCash',
-            'custid' => $custId,
-            'fidbank' => $fidBank,
-            'users' => $userId,
-            'date' => $paymentDate,
-            'billcd' => $billCd,
-            'aa' => $aa,
-            'nominal' => $nominal,
-        ]);
-
-        $result = $this->invokeStoredFunction('BuilderPaymentCash', [
+        $functionName = MultiVa::cashPaymentFunction();
+        $params = [
             $custId,
             $fidBank,
             $userId,
@@ -82,28 +77,66 @@ class ManualPaymentBuilder
             $billCd,
             $aa,
             $nominal,
-        ]);
-
-        $this->assertBuilderResult('BuilderPaymentCash', $result, [
+        ];
+        $context = [
             'custid' => $custId,
+            'fidbank' => $fidBank,
+            'users' => $userId,
+            'date' => $paymentDate,
+            'billcd' => $billCd,
             'aa' => $aa,
             'nominal' => $nominal,
-        ]);
+        ];
+
+        Log::info('manual-payment.builder.call', array_merge(['function' => $functionName], $context));
+
+        try {
+            $result = $this->invokeStoredFunction($functionName, $params);
+        } catch (\Throwable $e) {
+            if (!$this->isMissingRoutine($e, $functionName)) {
+                throw $e;
+            }
+
+            $functionName = 'BuilderPaymentCash';
+            Log::info('manual-payment.builder.fallback_legacy', [
+                'missing' => MultiVa::cashPaymentFunction(),
+                'fallback' => $functionName,
+                'aa' => $aa,
+            ]);
+            $result = $this->invokeStoredFunction($functionName, $params);
+        }
+
+        $this->assertBuilderResult($functionName, $result, $context);
     }
 
-    /** BuilderPaymentBill / BuilderPaymentBill_BankBayar_MultiVAPerTagihan93|94 (aa, nominal) */
-    private function callBuilderPaymentBill(string $aa, int $nominal, string $functionName = 'BuilderPaymentBill'): void
-    {
+    /** BuilderPaymentBill_MultiVAPerTagihan93|94 (aa, nominal) */
+    private function callBuilderPaymentBill(
+        string $aa,
+        int $nominal,
+        string $functionName = 'BuilderPaymentBill',
+        ?string $fallbackName = null
+    ): void {
         Log::info('manual-payment.builder.call', [
             'function' => $functionName,
             'aa' => $aa,
             'nominal' => $nominal,
         ]);
 
-        $result = $this->invokeStoredFunction($functionName, [
-            $aa,
-            $nominal,
-        ]);
+        try {
+            $result = $this->invokeStoredFunction($functionName, [$aa, $nominal]);
+        } catch (\Throwable $e) {
+            if ($fallbackName === null || !$this->isMissingRoutine($e, $functionName)) {
+                throw $e;
+            }
+
+            Log::info('manual-payment.builder.fallback_legacy', [
+                'missing' => $functionName,
+                'fallback' => $fallbackName,
+                'aa' => $aa,
+            ]);
+            $functionName = $fallbackName;
+            $result = $this->invokeStoredFunction($functionName, [$aa, $nominal]);
+        }
 
         $this->assertBuilderResult($functionName, $result, [
             'aa' => $aa,
@@ -165,5 +198,19 @@ class ManualPaymentBuilder
         }
 
         return (string) ($user->urut ?? Auth::id() ?? '');
+    }
+
+    private function isMissingRoutine(\Throwable $e, string $routine): bool
+    {
+        $message = $e->getMessage();
+
+        return stripos($message, $routine) !== false
+            && (
+                stripos($message, 'does not exist') !== false
+                || stripos($message, "doesn't exist") !== false
+                || stripos($message, 'unknown procedure') !== false
+                || stripos($message, 'unknown function') !== false
+                || stripos($message, '1305') !== false
+            );
     }
 }

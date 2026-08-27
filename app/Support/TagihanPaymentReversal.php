@@ -180,20 +180,26 @@ class TagihanPaymentReversal
         $hostname = Str::limit((string) ($request->ip() ?? ''), 250, '');
 
         if ($restore) {
-            $multiVaName = MultiVa::cancelProcedure($restore['reffbank']);
-            try {
-                $this->callNamedCancelProcedure($multiVaName, $custId, $aa, $billCd, $userId, $hostname);
+            $candidates = array_values(array_unique(array_filter([
+                MultiVa::cancelProcedure($restore['reffbank']),
+                MultiVa::cancelProcedureLegacy($restore['reffbank']),
+            ])));
 
-                return;
-            } catch (Throwable $e) {
-                if (!$this->isMissingRoutine($e, $multiVaName)) {
-                    throw $e;
+            foreach ($candidates as $procedureName) {
+                try {
+                    $this->callNamedCancelProcedure($procedureName, $custId, $aa, $billCd, $userId, $hostname);
+
+                    return;
+                } catch (Throwable $e) {
+                    if (!$this->isMissingRoutine($e, $procedureName)) {
+                        throw $e;
+                    }
+
+                    Log::info('tagihan-payment.cancel.fallback_legacy', [
+                        'missing' => $procedureName,
+                        'aa' => $aa,
+                    ]);
                 }
-
-                Log::info('tagihan-payment.cancel.fallback_legacy', [
-                    'missing' => $multiVaName,
-                    'aa' => $aa,
-                ]);
             }
         }
 

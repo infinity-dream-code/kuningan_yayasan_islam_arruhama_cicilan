@@ -139,10 +139,29 @@ class MultiVa
     {
         $va = self::normalize($reffBank) ?? self::OPEN;
 
+        return "BuilderPaymentBill_MultiVAPerTagihan{$va}";
+    }
+
+    /** Nama lama sebelum rename (salah copas _BankBayar_). */
+    public static function paymentFunctionLegacy(string $reffBank): string
+    {
+        $va = self::normalize($reffBank) ?? self::OPEN;
+
         return "BuilderPaymentBill_BankBayar_MultiVAPerTagihan{$va}";
     }
 
+    public static function cashPaymentFunction(): string
+    {
+        return 'BuilderPaymentCash_MultiVAPerTagihan';
+    }
+
     public static function cancelProcedure(string $reffBank): string
+    {
+        return 'CancelPaymentSaldo_MultiVAPerTagihan';
+    }
+
+    /** Nama lama: CancelPaymentSaldo_MultiVAPerTagihan93 / 94 */
+    public static function cancelProcedureLegacy(string $reffBank): string
     {
         $va = self::normalize($reffBank) ?? self::OPEN;
 

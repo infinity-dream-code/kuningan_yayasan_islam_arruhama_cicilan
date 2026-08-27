@@ -467,7 +467,7 @@ class ManualPembayaranController extends Controller
                 ];
 
                 /*
-                // Legacy: update scctbill + insert sccttran langsung dari PHP (nonaktif — pakai BuilderPaymentCash / BuilderPaymentBill)
+                // Legacy: update scctbill + insert sccttran langsung dari PHP (nonaktif — pakai BuilderPaymentCash_MultiVAPerTagihan / BuilderPaymentBill_MultiVAPerTagihan)
                 $billAm = (int) $item->BILLAM;
                 $billPaid = (int) ($item->BILLPAID ?? 0);
                 $newBillPaid = $billPaid + $nominal;

@@ -12,18 +12,28 @@ use App\Models\sccttran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SccttranController extends Controller
 {
     public ?string $sekolah = null;
 
-    private function topUpVaScope($query, string $tablePrefix = 'sccttran.')
+    private function topUpVaScope($query, string $tablePrefix = 'sccttran.', ?string $jenis = null)
     {
         $metodeColumn = $tablePrefix . 'METODE';
         $isReversalColumn = $tablePrefix . 'isreversal';
+        $metodes = match (strtolower(trim((string) $jenis))) {
+            'payment' => ['FROM INVOICE'],
+            'topup', 'top up' => ['TOP UP'],
+            default => ['TOP UP', 'FROM INVOICE'],
+        };
 
         return $query
-            ->whereRaw("UPPER(TRIM(COALESCE({$metodeColumn}, ''))) = 'TOP UP'")
+            ->where(function ($q) use ($metodeColumn, $metodes) {
+                foreach ($metodes as $metode) {
+                    $q->orWhereRaw("UPPER(TRIM(COALESCE({$metodeColumn}, ''))) = ?", [strtoupper($metode)]);
+                }
+            })
             ->where(function ($q) use ($isReversalColumn) {
                 $q->whereNull($isReversalColumn)
                     ->orWhere($isReversalColumn, 0)
@@ -72,7 +82,14 @@ class SccttranController extends Controller
             ->orderByRaw("CASE WHEN jenjang REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, jenjang")
             ->orderByRaw("CASE WHEN kelas REGEXP '^[0-9]+$' THEN 0 ELSE 1 END, kelas")
             ->get();
-        $data['metodes'] = collect(['TOP UP']);
+        $data['vaOptions'] = [
+            MultiVa::OPEN => MultiVa::optionLabel(MultiVa::OPEN),
+            MultiVa::CLOSE => MultiVa::optionLabel(MultiVa::CLOSE),
+        ];
+        $data['jenisOptions'] = [
+            'topup' => 'TOP UP',
+            'payment' => 'Payment',
+        ];
 
         return view('admin.keuangan.saldo.sccttran.index', $data);
     }
@@ -84,6 +101,7 @@ class SccttranController extends Controller
             ['data' => 'NOCUST', 'name' => 'NIS', 'searchable' => true, 'orderable' => true, 'exportable' => true],
             ['data' => 'NOVA', 'name' => 'NO VA', 'exportable' => true],
             ['data' => 'NMCUST', 'name' => 'NAMA', 'searchable' => true, 'orderable' => true, 'exportable' => true],
+            ['data' => 'KODE_PRODUK', 'name' => 'Kode Produk', 'orderable' => true, 'exportable' => true],
             ['data' => 'METODE', 'name' => 'Metode', 'orderable' => true, 'exportable' => true],
             ['data' => 'TRXDATE', 'name' => 'Tanggal Transaksi', 'orderable' => true, 'columnType' => 'timestamp', 'exportable' => true],
             ['data' => 'NOREFF', 'name' => 'No Ref', 'orderable' => true, 'exportable' => true],
@@ -120,7 +138,9 @@ class SccttranController extends Controller
             if (!$requestedColumn || $requestedColumn === 'no') {
                 $columnName = $defaultColumn;
             } elseif ($requestedColumn === 'NOMINAL') {
-                $columnName = 'sccttran.KREDIT';
+                $columnName = DB::raw("CASE WHEN UPPER(TRIM(COALESCE(sccttran.METODE, ''))) = 'TOP UP' THEN COALESCE(sccttran.KREDIT, 0) ELSE COALESCE(sccttran.DEBET, 0) END");
+            } elseif ($requestedColumn === 'KODE_PRODUK') {
+                $columnName = 'sccttran.REFFBANK';
             } elseif (!str_contains((string) $requestedColumn, '.')) {
                 $columnName = in_array($requestedColumn, ['NOCUST', 'NMCUST', 'NUM2ND', 'NOVA'], true)
                     ? 'scctcust.' . ($requestedColumn === 'NOVA' ? 'NOCUST' : $requestedColumn)
@@ -133,6 +153,8 @@ class SccttranController extends Controller
         $searchValue = $search_arr['value'] ?? '';
 
         $filter = $request->input('filter', []);
+        $jenis = null;
+        $vaFilter = null;
         if (is_array($filter)) {
             foreach ($filter as $key => $val) {
                 if (is_array($val)) {
@@ -147,6 +169,16 @@ class SccttranController extends Controller
                     continue;
                 }
 
+                if ($key === 'jenis') {
+                    $jenis = strtolower(trim((string) $val));
+                    continue;
+                }
+
+                if (in_array($key, ['va', 'kode_produk'], true)) {
+                    $vaFilter = MultiVa::normalize(is_array($val) ? ($val[0] ?? null) : $val);
+                    continue;
+                }
+
                 $colName = match ($key) {
                     'dari_tanggal', 'sampai_tanggal' => 'sccttran.TRXDATE',
                     'kelas' => 'scctcust.CODE03',
@@ -154,7 +186,6 @@ class SccttranController extends Controller
                     'nis' => 'scctcust.NOCUST',
                     'sekolah' => 'scctcust.CODE01',
                     'angkatan' => 'scctcust.DESC04',
-                    'metode' => 'sccttran.METODE',
                     default => null
                 };
 
@@ -176,7 +207,7 @@ class SccttranController extends Controller
                     continue;
                 }
 
-                if (in_array($key, ['nama', 'nis', 'metode'], true) && is_string($val)) {
+                if (in_array($key, ['nama', 'nis'], true) && is_string($val)) {
                     $filters[] = [$colName, 'like', '%' . $val . '%'];
                     continue;
                 }
@@ -238,8 +269,18 @@ class SccttranController extends Controller
 
         $query = $this->topUpVaScope(
             sccttran::query()
-                ->leftJoin('scctcust', 'scctcust.CUSTID', 'sccttran.CUSTID')
+                ->leftJoin('scctcust', 'scctcust.CUSTID', 'sccttran.CUSTID'),
+            'sccttran.',
+            $jenis
         );
+
+        if ($vaFilter) {
+            $vaValues = array_values(array_unique(array_filter([
+                $vaFilter,
+                MultiVa::prefix($vaFilter),
+            ])));
+            $query->whereIn('sccttran.REFFBANK', $vaValues);
+        }
 
         if (!blank($searchValue)) {
             $query->where(function ($q) use ($whereAny, $searchValue) {
@@ -258,7 +299,9 @@ class SccttranController extends Controller
 
         $totalRecords = $this->topUpVaScope(sccttran::query())->count();
         $totalRecordswithFilter = (clone $query)->count();
-        $totalNominal = (int) (clone $query)->sum('sccttran.KREDIT');
+        $totalNominal = (int) (clone $query)->sum(DB::raw(
+            "CASE WHEN UPPER(TRIM(COALESCE(sccttran.METODE, ''))) = 'TOP UP' THEN COALESCE(sccttran.KREDIT, 0) ELSE COALESCE(sccttran.DEBET, 0) END"
+        ));
 
         $records = (clone $query)->orderBy($columnName, $columnSortOrder)
             ->select($select)
@@ -266,13 +309,17 @@ class SccttranController extends Controller
             ->take($rowperpage > 0 ? $rowperpage : 10)
             ->get()
             ->map(function ($item) {
-                if ($item->NOCUST && $item->NOCUST != '-') {
-                    $NOVA = MultiVa::formatNoVaBoth($item->NOCUST);
-                } else {
-                    $NOVA = MultiVa::formatNoVaBoth($item->NUM2ND);
-                }
-                $item->NOVA = $NOVA;
-                $item->NOMINAL = (int) ($item->KREDIT ?? 0);
+                $nis = ($item->NOCUST && $item->NOCUST != '-') ? $item->NOCUST : $item->NUM2ND;
+                $va = MultiVa::normalize($item->REFFBANK);
+                $item->NOVA = $va
+                    ? MultiVa::formatNoVa($nis, $va)
+                    : MultiVa::formatNoVaBoth($nis);
+                $item->KODE_PRODUK = $va ? MultiVa::optionLabel($va) : '-';
+                $metode = strtoupper(trim((string) ($item->METODE ?? '')));
+                $item->METODE = $metode === 'FROM INVOICE' ? 'Payment' : ($item->METODE ?: '-');
+                $item->NOMINAL = $metode === 'TOP UP'
+                    ? (int) ($item->KREDIT ?? 0)
+                    : (int) (($item->DEBET ?? 0) > 0 ? $item->DEBET : ($item->KREDIT ?? 0));
                 unset($item->DEBET, $item->KREDIT);
 
                 return $item;
@@ -285,7 +332,7 @@ class SccttranController extends Controller
             'data' => $records,
             'totals' => [
                 'nominal' => [
-                    'location' => 7,
+                    'location' => 8,
                     'value' => $totalNominal,
                     'columnType' => 'currency',
                 ],

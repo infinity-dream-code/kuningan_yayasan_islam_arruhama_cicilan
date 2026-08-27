@@ -112,12 +112,72 @@ class RekapPenerimaanController extends Controller
 
     private function resolveMetodeLabel(object $item, array $metodeBayarMap): string
     {
+        $tranFid = trim((string) ($item->FIDBANK ?? ''));
+        $metode = strtoupper(trim((string) ($item->METODE ?? '')));
+
+        if ($metode === 'CASH' || $tranFid === '1140000') {
+            return $metodeBayarMap['1140000'] ?? 'Manual Cash';
+        }
+
         $displayFid = MetodeBayarHelper::resolveDisplayFidBank(
-            $item->BILL_FIDBANK ?? $item->FIDBANK ?? null,
-            $item->BILL_NOREFF ?? null
+            $tranFid !== '' ? $tranFid : ($item->BILL_FIDBANK ?? null),
+            $item->BILL_NOREFF ?? $item->NOREFF ?? null
         );
 
-        return $metodeBayarMap[$displayFid] ?? ($displayFid !== '' ? $displayFid : '-');
+        return $metodeBayarMap[$displayFid] ?? ($displayFid !== '' ? $displayFid : ($metode !== '' ? $metode : '-'));
+    }
+
+    /** Filter bank pada jurnal sccttran: cash ada di transaksi, bukan selalu di scctbill. */
+    private function bankFilterTokens(string $val): array
+    {
+        if ($val === MetodeBayarHelper::ANDROID_FIDBANK) {
+            return [['_android_bill', '=', '1']];
+        }
+
+        if ($val === '1140003') {
+            return [
+                ['scctbill.FIDBANK', '=', '1140003'],
+                ['_exclude_mobile_bill', '=', '1'],
+            ];
+        }
+
+        if ($val === '1140000') {
+            return [['_cash_tran', '=', '1']];
+        }
+
+        return [
+            ['_fidbank_either', '=', $val],
+            ['_exclude_mobile_bill', '=', '1'],
+        ];
+    }
+
+    private function applyPaymentBankToken($query, array $filter): bool
+    {
+        $flag = $filter[0] ?? null;
+
+        if ($flag === '_cash_tran') {
+            $query->where(function ($q) {
+                $q->where('sccttran.FIDBANK', '1140000')
+                    ->orWhere('scctbill.FIDBANK', '1140000')
+                    ->orWhereRaw("UPPER(TRIM(COALESCE(sccttran.METODE, ''))) = 'CASH'");
+            });
+
+            return true;
+        }
+
+        if ($flag === '_fidbank_either') {
+            $fid = (string) ($filter[2] ?? '');
+            if ($fid !== '') {
+                $query->where(function ($q) use ($fid) {
+                    $q->where('sccttran.FIDBANK', $fid)
+                        ->orWhere('scctbill.FIDBANK', $fid);
+                });
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private function resolvePeriode(object $item): ?string
@@ -429,16 +489,8 @@ class RekapPenerimaanController extends Controller
                         } else if ($key === 'unit') {
                             $filters[] = ['_sekolah', '=', $val];
                         } elseif ($key === 'bank') {
-                            if ((string) $val === '6') {
-                                $filters[] = ['_android_bill', '=', '1'];
-                            } elseif ((string) $val === '1140003') {
-                                // Transfer Bank Lain: ambil dari scctbill.FIDBANK
-                                $filters[] = ['scctbill.FIDBANK', '=', '1140003'];
-                                $filters[] = ['_exclude_mobile_bill', '=', '1'];
-                            } else {
-                                // Manual Cash/BMI/SALDO dari scctbill.FIDBANK
-                                $filters[] = ['scctbill.FIDBANK', '=', $val];
-                                $filters[] = ['_exclude_mobile_bill', '=', '1'];
+                            foreach ($this->bankFilterTokens((string) $val) as $token) {
+                                $filters[] = $token;
                             }
                         } else {
                             ($colName) && $filters[] = [$colName, '=', $val];
@@ -475,6 +527,9 @@ class RekapPenerimaanController extends Controller
                             }
                             if (($filter[0] ?? null) === '_android_bill') {
                                 MetodeBayarHelper::applyAndroidBankFilter($query);
+                                continue;
+                            }
+                            if ($this->applyPaymentBankToken($query, $filter)) {
                                 continue;
                             }
                             if (($filter[0] ?? null) === '_exclude_mobile_bill') {
@@ -703,15 +758,8 @@ class RekapPenerimaanController extends Controller
                         $val = '%' . $val . '%';
                         ($colName) && $filters[] = [$colName, 'like', $val];
                     } elseif ($key === 'bank') {
-                        if ((string) $val === '6') {
-                            $filters[] = ['_android_bill', '=', '1'];
-                        } elseif ((string) $val === '1140003') {
-                            // Transfer Bank Lain: ambil dari scctbill.FIDBANK
-                            $filters[] = ['scctbill.FIDBANK', '=', '1140003'];
-                            $filters[] = ['_exclude_mobile_bill', '=', '1'];
-                        } else {
-                            $filters[] = ['scctbill.FIDBANK', '=', $val];
-                            $filters[] = ['_exclude_mobile_bill', '=', '1'];
+                        foreach ($this->bankFilterTokens((string) $val) as $token) {
+                            $filters[] = $token;
                         }
                     } else {
                         ($colName) && $filters[] = [$colName, '=', $val];
@@ -726,6 +774,8 @@ class RekapPenerimaanController extends Controller
             if (($item[0] ?? null) === '_sekolah'
                 || ($item[0] ?? null) === '_android_bill'
                 || ($item[0] ?? null) === '_exclude_mobile_bill'
+                || ($item[0] ?? null) === '_cash_tran'
+                || ($item[0] ?? null) === '_fidbank_either'
                 || str_contains((string) ($item[0] ?? ''), 'scctbill')
                 || str_contains((string) ($item[0] ?? ''), 'sccttran')) {
                 $filter_scctbill[] = $item;
@@ -749,6 +799,9 @@ class RekapPenerimaanController extends Controller
                         }
                         if (($filter[0] ?? null) === '_android_bill') {
                             MetodeBayarHelper::applyAndroidBankFilter($query);
+                            continue;
+                        }
+                        if ($this->applyPaymentBankToken($query, $filter)) {
                             continue;
                         }
                         if (($filter[0] ?? null) === '_exclude_mobile_bill') {

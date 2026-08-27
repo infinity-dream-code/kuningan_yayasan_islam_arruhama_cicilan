@@ -143,19 +143,35 @@
                             </div>
 
                             <div class="mb-3 row">
-                                <label class="col-sm-4 col-form-label form-label" for="filter[metode]">
-                                    Metode
+                                <label class="col-sm-4 col-form-label form-label" for="filter[va]">
+                                    Kode Produk
                                 </label>
                                 <div class="col">
-                                    <select class="form-select" id="filter[metode]" name="filter[metode]"
-                                            data-control="select2" data-placeholder="Pilih Metode"
-                                            data-allow-clear="true">
+                                    <select class="form-select" id="filter[va]" name="filter[va]"
+                                            data-control="select2" data-placeholder="Pilih Kode Produk">
                                         <option value="all">Semua</option>
-                                        @isset($metodes)
-                                            @foreach($metodes as $metode)
-                                                <option value="{{ $metode }}">{{ $metode }}</option>
+                                        @isset($vaOptions)
+                                            @foreach($vaOptions as $value => $label)
+                                                <option value="{{ $value }}">{{ $label }}</option>
                                             @endforeach
-                                        @endif
+                                        @endisset
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label form-label" for="filter[jenis]">
+                                    Jenis
+                                </label>
+                                <div class="col">
+                                    <select class="form-select" id="filter[jenis]" name="filter[jenis]"
+                                            data-control="select2" data-placeholder="Pilih Jenis">
+                                        <option value="all">Semua</option>
+                                        @isset($jenisOptions)
+                                            @foreach($jenisOptions as $value => $label)
+                                                <option value="{{ $value }}">{{ $label }}</option>
+                                            @endforeach
+                                        @endisset
                                     </select>
                                 </div>
                             </div>

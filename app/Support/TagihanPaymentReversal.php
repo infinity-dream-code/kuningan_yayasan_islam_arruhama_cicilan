@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class TagihanPaymentReversal
@@ -48,14 +49,48 @@ class TagihanPaymentReversal
 
     public function deleteUnpaidTagihan(scctbill $tagihan, Request $request): void
     {
-        if ($this->hasBillPayments($tagihan)) {
-            $this->reverseAllPayments($tagihan, $request);
-            $tagihan->refresh();
+        if (!$this->canDeleteUnpaidTagihan($tagihan)) {
+            throw new RuntimeException(
+                'Tagihan tidak dapat dihapus karena sudah ada pembayaran cicilan. Gunakan reversal di menu Data Tagihan.'
+            );
         }
 
         $tagihan->update([
             'FSTSBolehBayar' => 0,
         ]);
+    }
+
+    public function canDeleteUnpaidTagihan(scctbill $tagihan): bool
+    {
+        if ((int) ($tagihan->INSTALLMENT ?? 0) > 0) {
+            return false;
+        }
+
+        return !$this->hasBillPayments($tagihan);
+    }
+
+    public function applyWithoutPaymentScope($query, string $billAlias = 'scctbill')
+    {
+        return $query
+            ->where(function ($q) use ($billAlias) {
+                $q->whereNull("{$billAlias}.BILLPAID")
+                    ->orWhere("{$billAlias}.BILLPAID", '<=', 0);
+            })
+            ->where(function ($q) use ($billAlias) {
+                $q->whereNull("{$billAlias}.INSTALLMENT")
+                    ->orWhere("{$billAlias}.INSTALLMENT", '<=', 0);
+            })
+            ->whereNotExists(function ($sub) use ($billAlias) {
+                $sub->select(DB::raw(1))
+                    ->from('sccttran')
+                    ->whereColumn('sccttran.BILLID', "{$billAlias}.AA")
+                    ->whereColumn('sccttran.CUSTID', "{$billAlias}.CUSTID")
+                    ->where('sccttran.DEBET', '>', 0)
+                    ->where(function ($q) {
+                        $q->whereRaw('UPPER(TRIM(COALESCE(sccttran.METODE, ""))) = ?', ['FROM TELLER'])
+                            ->orWhere('sccttran.FIDBANK', self::SALDO_FIDBANK);
+                    });
+            });
     }
 
     public function hasBillPayments(scctbill $tagihan): bool

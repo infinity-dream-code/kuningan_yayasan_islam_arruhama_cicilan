@@ -47,6 +47,10 @@
                     <li class="list-group-item list-group-timeline-danger">
                         <strong>Pastikan browser anda tidak memblokir <i>POP-UP</i>!</strong>
                     </li>
+                    <li class="list-group-item list-group-timeline-warning">
+                        Tagihan yang sudah ada pembayaran cicilan tidak dapat dihapus dari menu ini.
+                        Untuk membatalkan pembayaran, gunakan tombol Reversal di menu Data Tagihan.
+                    </li>
                 </ul>
             </div>
             <form id="rekapForm">
@@ -195,7 +199,8 @@
                         <span class="ri-delete-bin-line ri-3x"></span>
                         <h4>Hapus Tagihan Siswa?</h4>
                         <div class="">
-                            anda yakin akan menghapus data tagihan Siswa?
+                            Anda yakin akan menghapus data tagihan siswa?
+                            Tagihan yang sudah ada pembayaran cicilan tidak akan dihapus.
                         </div>
                     </div>
                     <div class="modal-body py-4">

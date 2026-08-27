@@ -200,6 +200,8 @@ class HapusTagihanController extends Controller
             ->where('scctbill.FSTSBolehBayar', 1)
             ->where('scctcust.STCUST', 1);
 
+        app(TagihanPaymentReversal::class)->applyWithoutPaymentScope($query);
+
         SchoolScope::apply($query, 'scctcust', $this->sekolah);
 
         $query->when(!blank($searchValue), function ($query) use ($whereAny, $searchValue) {
@@ -217,12 +219,15 @@ class HapusTagihanController extends Controller
             });
 
         $scopeKey = blank($this->sekolah) ? 'all' : $this->sekolah;
-        $totalRecords = Cache::remember('total_tagihan_count_' . $scopeKey, 600, function () {
-            return scctbill::query()
+        $totalRecords = Cache::remember('total_hapus_tagihan_count_' . $scopeKey, 600, function () {
+            $countQuery = scctbill::query()
                 ->leftJoin('scctcust', 'scctcust.CUSTID', '=', 'scctbill.CUSTID')
                 ->where('scctbill.FSTSBolehBayar', 1)
                 ->where('scctbill.PAIDST', 0)
-                ->when($this->sekolah, fn ($q) => $q->where('scctcust.CODE01', $this->sekolah))
+                ->when($this->sekolah, fn ($q) => $q->where('scctcust.CODE01', $this->sekolah));
+
+            return app(TagihanPaymentReversal::class)
+                ->applyWithoutPaymentScope($countQuery)
                 ->count();
         });
 
@@ -269,8 +274,15 @@ class HapusTagihanController extends Controller
             return response()->json(['message' => 'Siswa tidak ditemukan!'], 422);
         }
 
+        $reversal = app(TagihanPaymentReversal::class);
+        if (!$reversal->canDeleteUnpaidTagihan($tagihan)) {
+            return response()->json([
+                'message' => 'Tagihan tidak dapat dihapus karena sudah ada pembayaran cicilan. Gunakan reversal di menu Data Tagihan.',
+            ], 422);
+        }
+
         try {
-            app(TagihanPaymentReversal::class)->deleteUnpaidTagihan($tagihan, $request);
+            $reversal->deleteUnpaidTagihan($tagihan, $request);
 
             return response()->json(['message' => 'Tagihan dihapus!'], 200);
         } catch (\Exception $e) {
@@ -315,11 +327,32 @@ class HapusTagihanController extends Controller
                 ->where('PAIDST', 0)
                 ->get();
 
+            $deletable = [];
+            $blocked = 0;
             foreach ($tagihans as $tagihan) {
+                if (!$reversal->canDeleteUnpaidTagihan($tagihan)) {
+                    $blocked++;
+                    continue;
+                }
+                $deletable[] = $tagihan;
+            }
+
+            if ($deletable === []) {
+                return response()->json([
+                    'message' => 'Tagihan tidak dapat dihapus karena sudah ada pembayaran cicilan. Gunakan reversal di menu Data Tagihan.',
+                ], 422);
+            }
+
+            foreach ($deletable as $tagihan) {
                 $reversal->deleteUnpaidTagihan($tagihan, $request);
             }
 
-            return response()->json(['message' => 'Tagihan dihapus!'], 200);
+            $deleted = count($deletable);
+            $message = $blocked > 0
+                ? "{$deleted} tagihan dihapus. {$blocked} dilewati karena sudah ada pembayaran cicilan."
+                : 'Tagihan dihapus!';
+
+            return response()->json(['message' => $message], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Gagal Menghapus Tagihan!',

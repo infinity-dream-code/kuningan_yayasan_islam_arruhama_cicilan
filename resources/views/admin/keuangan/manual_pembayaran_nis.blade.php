@@ -1093,7 +1093,7 @@
                         ])
 
                         tableBody.push([
-                            {colSpan: 4, text: 'Biaya Layanan', alignment: 'right', style: 'tableHeader'},
+                            {colSpan: 4, text: 'Biaya Admin', alignment: 'right', style: 'tableHeader'},
                             {}, {}, {},
                             {text: formatRupiah(biayaLayanan), alignment: 'right'},
                             {}, {}

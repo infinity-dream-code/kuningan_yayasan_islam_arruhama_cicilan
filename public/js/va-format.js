@@ -1,10 +1,10 @@
 /**
  * Format No. VA: prefix + NIS (total 16 digit).
- * Open 7797793 (VA 93 / cicil), Close 7797794 (VA 94 / non-cicil).
+ * Open 797793 (VA 93 / cicil), Close 797794 (VA 94 / non-cicil).
  */
 (function (window) {
-    const DEFAULT_OPEN = '7797793';
-    const DEFAULT_CLOSE = '7797794';
+    const DEFAULT_OPEN = '797793';
+    const DEFAULT_CLOSE = '797794';
     const TOTAL_LENGTH = 16;
 
     function digitsOnly(value) {

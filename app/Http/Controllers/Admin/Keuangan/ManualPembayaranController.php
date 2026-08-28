@@ -593,10 +593,9 @@ class ManualPembayaranController extends Controller
             $receipt = $request->session()->get('manual_pembayaran_receipt', []);
             $enrichedTagihans = $this->enrichTagihansForReceipt($tagihans, (string) $cust, $receipt);
             $receiptBank = $receipt['bank'] ?? ($enrichedTagihans[0]['FIDBANK'] ?? null);
+            $biayaLayanan = $this->resolveBiayaLayanan($receiptBank);
 
             if ($request->boolean('pdf')) {
-                $fIdBank = $receiptBank;
-//                $biayaLayanan = ($fIdBank === '1140002') ? 0 : 2000;
                 $receiptMode = strtolower((string)$request->query('receipt_mode', 'manual'));
                 $isNisLikeReceipt = $receiptMode === 'nis';
 
@@ -605,7 +604,7 @@ class ManualPembayaranController extends Controller
                     'tagihans' => collect($enrichedTagihans)->map(fn ($row) => (object) $row),
                     'siswa' => $siswa,
                     'nis' => $request->boolean('no_daftar'),
-                    'biayaLayanan' => 0,
+                    'biayaLayanan' => $biayaLayanan,
                     'fidbank' => $receiptBank,
                 ];
 
@@ -613,8 +612,6 @@ class ManualPembayaranController extends Controller
 
                 return $pdf->stream('bukti-pembayaran.pdf');
             }
-
-            $biayaLayanan = 0;
 
             return response()->json([
                 'tagihans' => $enrichedTagihans,
@@ -836,5 +833,17 @@ class ManualPembayaranController extends Controller
         }
 
         return 0;
+    }
+
+    /** Manual Cash/BMI dkk: 2000. Manual SALDO: 0. */
+    private function resolveBiayaLayanan(?string $fidBank): int
+    {
+        $fidBank = preg_replace('/\D/', '', (string) $fidBank);
+
+        if ($fidBank === '' || $fidBank === '1140002') {
+            return 0;
+        }
+
+        return 2000;
     }
 }

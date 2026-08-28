@@ -10,21 +10,25 @@ class MultiVa
 {
     public const OPEN = '93';
     public const CLOSE = '94';
+    public const OPEN_PREFIX = '797793';
+    public const CLOSE_PREFIX = '797794';
+    public const LEGACY_OPEN_PREFIXES = ['7797793', '779793'];
+    public const LEGACY_CLOSE_PREFIXES = ['7797794', '779794'];
 
     private static ?\Illuminate\Support\Collection $masters = null;
 
     public static function openPrefix(): string
     {
-        $raw = preg_replace('/\D/', '', (string) config('app.va_open', '7797793'));
+        $raw = preg_replace('/\D/', '', (string) config('app.va_open', self::OPEN_PREFIX));
 
-        return $raw !== '' ? $raw : '7797793';
+        return $raw !== '' ? $raw : self::OPEN_PREFIX;
     }
 
     public static function closePrefix(): string
     {
-        $raw = preg_replace('/\D/', '', (string) config('app.va_close', '7797794'));
+        $raw = preg_replace('/\D/', '', (string) config('app.va_close', self::CLOSE_PREFIX));
 
-        return $raw !== '' ? $raw : '7797794';
+        return $raw !== '' ? $raw : self::CLOSE_PREFIX;
     }
 
     public static function prefix(string $reffBank): string
@@ -42,10 +46,10 @@ class MultiVa
         }
 
         $digits = preg_replace('/\D/', '', $raw);
-        if (in_array($digits, [self::OPEN, self::openPrefix()], true)) {
+        if (in_array($digits, array_merge([self::OPEN, self::openPrefix()], self::LEGACY_OPEN_PREFIXES), true)) {
             return self::OPEN;
         }
-        if (in_array($digits, [self::CLOSE, self::closePrefix()], true)) {
+        if (in_array($digits, array_merge([self::CLOSE, self::closePrefix()], self::LEGACY_CLOSE_PREFIXES), true)) {
             return self::CLOSE;
         }
 
@@ -253,7 +257,7 @@ class MultiVa
 
     /**
      * Prefix bank: VA 93/94 (atau nomor lengkap) dulu, lalu cicil di master/tagihan.
-     * VA lama (mis. 81) + non-cicil → Close 7797794; cicil → Open 7797793.
+     * VA lama (mis. 81) + non-cicil → Close 797794; cicil → Open 797793.
      */
     public static function prefixFromContext(mixed $va = null, mixed $isInstallment = null, ?string $billName = null): string
     {

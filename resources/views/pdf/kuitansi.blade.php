@@ -8,7 +8,9 @@
             ? \App\Support\MultiVa::formatNoVaFromBills($nis, $tagihans ?? [])
             : \App\Support\MultiVa::formatNoVaFromBills($siswa->NUM2ND ?? '', $tagihans ?? []);
         $ortu = $siswa->GENUS ?? '-';
-        $total = collect($tagihans ?? [])->sum('BILLAM');
+        $total = collect($tagihans ?? [])->sum(fn ($item) => (int) ($item->NOMINAL_BAYAR ?? $item->BILLAM ?? 0));
+        $biayaLayanan = (int) ($biayaLayanan ?? 0);
+        $grandTotal = $total + $biayaLayanan;
     @endphp
     <table width="100%">
         <tr>
@@ -55,9 +57,19 @@
         @endforeach
         </tbody>
         <tfoot>
+        @if($biayaLayanan > 0)
+            <tr>
+                <td colspan="3" align="right"><strong>Total Tagihan</strong></td>
+                <td align="right"><strong>@rupiah($total)</strong></td>
+            </tr>
+            <tr>
+                <td colspan="3" align="right"><strong>Biaya Admin</strong></td>
+                <td align="right"><strong>@rupiah($biayaLayanan)</strong></td>
+            </tr>
+        @endif
         <tr>
             <td colspan="3" align="right"><strong>Total</strong></td>
-            <td align="right"><strong>@rupiah($total)</strong></td>
+            <td align="right"><strong>@rupiah($grandTotal)</strong></td>
         </tr>
         </tfoot>
     </table>

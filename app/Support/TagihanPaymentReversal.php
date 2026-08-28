@@ -179,31 +179,35 @@ class TagihanPaymentReversal
         $userId = $this->resolveCyberKeyUserId();
         $hostname = Str::limit((string) ($request->ip() ?? ''), 250, '');
 
+        $candidates = [
+            MultiVa::cancelProcedure($restore['reffbank'] ?? ''),
+        ];
+
         if ($restore) {
-            $candidates = array_values(array_unique(array_filter([
-                MultiVa::cancelProcedure($restore['reffbank']),
-                MultiVa::cancelProcedureLegacy($restore['reffbank']),
-            ])));
-
-            foreach ($candidates as $procedureName) {
-                try {
-                    $this->callNamedCancelProcedure($procedureName, $custId, $aa, $billCd, $userId, $hostname);
-
-                    return;
-                } catch (Throwable $e) {
-                    if (!$this->isMissingRoutine($e, $procedureName)) {
-                        throw $e;
-                    }
-
-                    Log::info('tagihan-payment.cancel.fallback_legacy', [
-                        'missing' => $procedureName,
-                        'aa' => $aa,
-                    ]);
-                }
-            }
+            $candidates[] = MultiVa::cancelProcedureLegacy($restore['reffbank']);
         }
 
-        $this->callNamedCancelProcedure('CancelPaymentSaldo', $custId, $aa, $billCd, $userId, $hostname);
+        $candidates[] = 'CancelPaymentSaldo';
+        $candidates = array_values(array_unique(array_filter($candidates)));
+
+        $lastIndex = count($candidates) - 1;
+        foreach ($candidates as $index => $procedureName) {
+            try {
+                $this->callNamedCancelProcedure($procedureName, $custId, $aa, $billCd, $userId, $hostname);
+
+                return;
+            } catch (Throwable $e) {
+                $isLast = $index === $lastIndex;
+                if ($isLast || !$this->isMissingRoutine($e, $procedureName)) {
+                    throw $e;
+                }
+
+                Log::info('tagihan-payment.cancel.fallback_legacy', [
+                    'missing' => $procedureName,
+                    'aa' => $aa,
+                ]);
+            }
+        }
     }
 
     private function callNamedCancelProcedure(
